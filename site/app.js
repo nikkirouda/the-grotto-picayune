@@ -258,7 +258,7 @@ function card(it, lead) {
   $('.mute', n).onclick = () => { if (confirm(`Mute ${it._src}? You can unmute it in Settings → Sources.`)) { savePrefsLocal({ muted_sources: Array.from(new Set([...(prefs.muted_sources || []), it.source])) }); fillSettings(); buildList(); } };
   $('.block', n).onclick = () => {
     const w = prompt('Block a word or phrase (whole word, any story):', it._tok[0] || '');
-    if (w && w.trim()) { savePrefsLocal({ blocked_terms: Array.from(new Set([...(prefs.blocked_terms || []), w.trim()])) }); fillSettings(); buildList(); }
+    if (w && w.trim()) { savePrefsLocal({ blocked_terms: Array.from(new Set([...(prefs.blocked_terms || []), w.trim()])) }); fillSettings(); fillTopics(); buildList(); }
   };
   return n;
 }
@@ -311,7 +311,30 @@ function go() {
 }
 
 // ------------------------------------------------------------- settings drawer
-function openSettings(open) { $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) fillSettings(); }
+function openSettings(open) { if (open) openTopics(false); $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) fillSettings(); }
+function openTopics(open) { if (open) openSettings(false); $('#topics').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#topics').setAttribute('aria-hidden', String(!open)); if (open) { fillTopics(); setTimeout(() => $('#addBoost input').focus(), 250); } }
+function countHits(term) {
+  const re = termRegex([term]); if (!re) return 0;
+  let n = 0; for (const it of bundle.items) if (re.test(it._text)) n++; return n;
+}
+function fillTopics() {
+  const chips = (key, el) => {
+    const list = prefs[key] || [];
+    el.innerHTML = list.map(t => `<span class="chip" data-t="${esc(t)}" title="Take off the list">${esc(t)}<span class="n">${countHits(t)}</span></span>`).join('') || '<span class="muted small">nothing yet</span>';
+    $$('.chip', el).forEach(c => c.onclick = () => { savePrefsLocal({ [key]: list.filter(x => x !== c.dataset.t) }); fillTopics(); buildList(); });
+  };
+  chips('boosted_terms', $('#boostChips')); chips('blocked_terms', $('#blockChips'));
+  $('#topicsNote').textContent = LS.get('token', '') ? 'Changes save to the paper and reach your other devices at the next sync.' : 'Saved on this device. To carry these to your other devices, add a token in Settings → Sync.';
+}
+function addTerm(key, inputEl) {
+  const t = inputEl.value.trim().replace(/\s+/g, ' ');
+  if (!t) return;
+  const other = key === 'boosted_terms' ? 'blocked_terms' : 'boosted_terms';
+  const list = (prefs[key] || []).filter(x => x.toLowerCase() !== t.toLowerCase());
+  const patch = { [key]: [...list, t] };
+  if ((prefs[other] || []).some(x => x.toLowerCase() === t.toLowerCase())) patch[other] = (prefs[other] || []).filter(x => x.toLowerCase() !== t.toLowerCase());
+  savePrefsLocal(patch); inputEl.value = ''; fillTopics(); buildList();
+}
 function fillSettings() {
   $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact;
   $('#blockedTerms').value = (prefs.blocked_terms || []).join('\n'); $('#blockedCount').textContent = `(${(prefs.blocked_terms || []).length})`;
@@ -348,7 +371,11 @@ function guessRepo() {
 function wireSettings() {
   $('#settingsBtn').onclick = () => openSettings(true);
   $('#closeSettings').onclick = () => openSettings(false);
-  $('#scrim').onclick = () => openSettings(false);
+  $('#topicsBtn').onclick = () => openTopics(true);
+  $('#closeTopics').onclick = () => openTopics(false);
+  $('#scrim').onclick = () => { openSettings(false); openTopics(false); };
+  $('#addBoost').onsubmit = e => { e.preventDefault(); addTerm('boosted_terms', $('#addBoost input')); };
+  $('#addBlock').onsubmit = e => { e.preventDefault(); addTerm('blocked_terms', $('#addBlock input')); };
   const opt = (id, key, after) => $(id).onchange = e => { opts[key] = e.target.checked; LS.set('opts', opts); document.body.classList.toggle('compact', opts.compact); buildList(); };
   opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact');
   const lines = v => v.split('\n').map(x => x.trim()).filter(Boolean);

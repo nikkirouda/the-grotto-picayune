@@ -21,6 +21,7 @@
       <input id="q" type="search" placeholder="Search the week's stories" autocomplete="off" aria-label="Search">
     </form>
     <div class="tools">
+      <button class="icon-btn" id="topicsBtn" title="Topics: more of this, none of this" aria-label="Topics">★</button>
       <button class="icon-btn" id="themeBtn" title="Light / dark" aria-label="Toggle theme">◐</button>
       <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
     </div>
@@ -102,6 +103,25 @@
     </details>
 
     <p class="muted small" id="buildInfo"></p>
+  </div>
+</aside>
+<aside id="topics" class="drawer" aria-hidden="true">
+  <div class="drawer-head"><h2>Topics</h2><button class="icon-btn" id="closeTopics" aria-label="Close">✕</button></div>
+  <div class="drawer-body">
+    <p class="muted small">Name a thing as you think of it. A word or a phrase; whole-word match in headline or summary; not case-sensitive.</p>
+    <section class="topic-group">
+      <h3>More of this</h3>
+      <form class="add" id="addBoost"><input placeholder="e.g. steam heating, Bainbridge ferry" autocomplete="off"><button type="submit">Add</button></form>
+      <div class="chips boost" id="boostChips"></div>
+      <p class="muted small">Stories mentioning these float up in every section.</p>
+    </section>
+    <section class="topic-group">
+      <h3>None of this</h3>
+      <form class="add" id="addBlock"><input placeholder="e.g. Oscars, royal family" autocomplete="off"><button type="submit">Add</button></form>
+      <div class="chips" id="blockChips"></div>
+      <p class="muted small">Stories mentioning these are removed outright. Tap a chip to take it off the list.</p>
+    </section>
+    <p class="muted small" id="topicsNote"></p>
   </div>
 </aside>
 <div id="scrim" class="scrim"></div>

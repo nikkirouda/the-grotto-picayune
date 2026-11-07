@@ -126,3 +126,13 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
   .card.lead h3 { font-size: 1.3rem; }
   .section-head h1 { font-size: 1.3rem; }
 }
+
+.topic-group { border-bottom: 1px solid var(--line); padding: 10px 0 14px; }
+.topic-group h3 { margin: 6px 0 8px; font-family: var(--font); font-size: 1.15rem; }
+.add { display: flex; gap: 8px; margin-bottom: 10px; }
+.add input { flex: 1; min-width: 0; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); font: inherit; font-size: 1rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: .85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip .n { color: var(--muted); font-size: .75rem; }
+.chip:hover { border-color: var(--dislike); color: var(--dislike); }
+.chip:hover::after { content: "✕"; font-size: .75rem; }

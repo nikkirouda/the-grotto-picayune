@@ -60,6 +60,8 @@ site/ (index.html, app.js) ──► GitHub Pages
 ## Everyday
 
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.
+- ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
+  matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
 - 👍 / 👎 on any card teaches the ranking; *mute* silences a source; *block…* removes a word everywhere.
 - Settings shows what has been learned, the source health from the last build, and backup/restore.
 - To add a public source: a line in `feeds.yml`, commit. To add a place or a private source, or to
