@@ -83,6 +83,10 @@
     {
       "id": "games",
       "name": "D&D & Games"
+    },
+    {
+      "id": "fun",
+      "name": "Fun"
     }
   ]
 }
