@@ -290,7 +290,7 @@ async function openReader(it, n) {
   if (!location.hash.endsWith('/read')) history.pushState({ reader: it.id }, '', location.hash + '/read');
   if (n) markRead(it, n);
   try {
-    let text;
+    let text, art;
     if (manifest.encrypted) {
       if (!articleKey) {
         const pass = LS.get('pass', null);
@@ -298,16 +298,47 @@ async function openReader(it, n) {
       }
       const buf = new Uint8Array(await fetch(`data/a/${it.id}.bin`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.arrayBuffer(); }));
       const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, articleKey, buf.slice(12));
-      text = JSON.parse(new TextDecoder().decode(plain)).text;
+      art = JSON.parse(new TextDecoder().decode(plain));
     } else {
-      text = (await fetch(`data/a/${it.id}.json`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.json(); })).text;
+      art = await fetch(`data/a/${it.id}.json`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.json(); });
     }
+    text = art.text || '';
     if (readerItem !== it) return;
-    $('#readerText').innerHTML = text.split(/\n{1,}/).map(par => par.trim()).filter(Boolean).map(par => par.length < 80 && !/[.!?]$/.test(par) ? `<h3>${esc(par)}</h3>` : `<p>${esc(par)}</p>`).join('');
-    $('#readerFoot').textContent = `Text fetched from ${it._src} for your reading only. Photos, captions and anything shown as a graphic stay at the source.`;
+    const hero = it.image ? imgKey(it.image) : null;
+    $('#readerText').innerHTML = art.html ? sanitizeArticle(art.html, hero) : text.split(/\n{1,}/).map(par => par.trim()).filter(Boolean).map(par => par.length < 80 && !/[.!?]$/.test(par) ? `<h3>${esc(par)}</h3>` : `<p>${esc(par)}</p>`).join('');
+    const extra = (art.images || []).filter(im => opts.images && imgKey(im.src) !== hero);
+    if (extra.length) {
+      $('#readerText').insertAdjacentHTML('beforeend', `<div class="gallery"><h3>More pictures from the story</h3>${extra.map(im => `<figure><img src="${esc(im.src)}" alt="${esc(im.alt)}" loading="lazy" referrerpolicy="no-referrer"><figcaption>${esc(im.caption || im.alt)}</figcaption></figure>`).join('')}</div>`);
+    }
+    $$('#readerText img').forEach(im => { im.loading = 'lazy'; im.referrerPolicy = 'no-referrer'; im.onerror = () => { const f = im.closest('figure'); (f || im).remove(); }; });
+    $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
   } catch (e) {
     $('#readerText').innerHTML = `<p class="muted">The text is not in the paper. <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a></p>`;
   }
+}
+function imgKey(u) { try { const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }
+const READER_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'STRONG', 'EM', 'B', 'I', 'BR', 'IMG', 'FIGURE', 'FIGCAPTION']);
+function sanitizeArticle(htmlText, hero) {
+  // The build already cleaned this; a second pass costs nothing and keeps the page honest about what it renders.
+  const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+  const walk = node => {
+    for (const el of Array.from(node.children)) {
+      if (!READER_TAGS.has(el.tagName)) { el.replaceWith(...Array.from(el.childNodes)); continue; }
+      if (el.tagName === 'IMG') {
+        const src = el.getAttribute('src') || '';
+        if (!/^https?:/.test(src) || (hero && imgKey(src) === hero)) { (el.closest('figure') || el).remove(); continue; }
+        const alt = el.getAttribute('alt') || '';
+        for (const a of Array.from(el.attributes)) el.removeAttribute(a.name);
+        el.setAttribute('src', src); el.setAttribute('alt', alt);
+      } else {
+        for (const a of Array.from(el.attributes)) el.removeAttribute(a.name);
+      }
+      walk(el);
+    }
+  };
+  walk(doc.body);
+  for (const el of Array.from(doc.body.querySelectorAll('p, li, h2, h3, h4'))) if (!el.textContent.trim() && !el.querySelector('img')) el.remove();
+  return doc.body.innerHTML;
 }
 function closeReader(fromHistory) {
   $('#reader').classList.add('hidden'); document.body.style.overflow = ''; readerItem = null;

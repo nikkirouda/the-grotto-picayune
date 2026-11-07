@@ -37,8 +37,9 @@ site/ (index.html, app.js) ──► GitHub Pages
   weather for each place, and writes the bundle.
 - **The reader.** For up to 250 new stories a run the build also visits the story and keeps its readable
   text (trafilatura), one small encrypted file per story under `site/data/a/`. Tapping a headline then
-  opens the story inside the page: text and photo, no ads, no cookie banners, with a *read at source*
-  link. Stories whose page gave no usable text (paywalls, teasers, sites that refuse readers) open at
+  opens the story inside the page: text and the pictures that belong to it (the extractor keeps the
+  images it finds in the text; other content photos from the page, with captions, follow at the end),
+  no ads, no cookie banners, with a *read at source* link. Stories whose page gave no usable text (paywalls, teasers, sites that refuse readers) open at
   the source as before. The texts are for your own reading; the files are encrypted like everything
   else and never republished. A source can opt out with `fulltext: false` in `feeds.yml`.
 - **Ranking** happens in the browser, one method, in `site/app.js`:

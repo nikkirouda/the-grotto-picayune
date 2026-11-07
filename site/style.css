@@ -152,3 +152,9 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 .reader-actions { justify-content: center; gap: 16px; }
 .reader-actions .vote { font-size: 1.4rem; padding: 8px 14px; }
 @media (max-width: 640px) { .reader-body h1 { font-size: 1.4rem; } #readerText { font-size: 1.08rem; } }
+
+#readerText figure { margin: 1.2em 0; }
+#readerText figure img, #readerText > img, #readerText p > img { width: 100%; height: auto; border-radius: 10px; display: block; }
+#readerText figcaption { font-family: var(--sans); font-size: .82rem; color: var(--muted); margin-top: 6px; }
+#readerText blockquote { margin: 1em 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.gallery { margin-top: 1.5em; border-top: 1px solid var(--line); padding-top: 6px; }

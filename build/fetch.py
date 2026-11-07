@@ -21,7 +21,7 @@ import os
 import re
 import sys
 import time
-from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode, urljoin
 
 import feedparser
 import requests
@@ -200,8 +200,140 @@ def og_image(url):
     except Exception:
         return ""
 
+ARTICLE_VERSION = 2
+ALLOWED_TAGS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "strong", "em", "b", "i", "br", "img", "figure", "figcaption"}
+BAD_IMG = re.compile(r"logo|icon|avatar|sprite|badge|pixel|1x1|spacer|placeholder|emoji|\.svg(\?|$)|/ads?/|doubleclick|gravatar", re.I)
+BAD_MEDIA = re.compile(r"\.(mp4|m3u8|flv|webm|mov|mp3)(\?|$)|/video/|hlsvod|/flv/", re.I)
+BAD_ZONE = re.compile(r"related|recommend|teaser|promo|sidebar|footer|nav|share|comment|newsletter|subscribe|trending|popular|most-read|cookie|banner|author|byline|widget", re.I)
+
+def _biggest_from_srcset(srcset):
+    best, best_w = None, -1
+    for part in srcset.split(","):
+        bits = part.strip().split()
+        if not bits:
+            continue
+        w = 0
+        if len(bits) > 1 and bits[1].endswith("w"):
+            try:
+                w = int(bits[1][:-1])
+            except ValueError:
+                w = 0
+        if w > best_w:
+            best, best_w = bits[0], w
+    return best
+
+def _img_key(u):
+    """Loose identity for an image URL: host+path without size/query noise."""
+    try:
+        p = urlparse(u)
+        path = re.sub(r"(\.(jpe?g|png|webp|avif|gif))+$", "", p.path, flags=re.I)
+        return (p.netloc.lower().replace("www.", "") + re.sub(r"[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$", "", path)).lower()
+    except Exception:
+        return u
+
+def page_images(doc, base_url, limit=6):
+    """Content photos from the page itself: inside article/main when present, never in nav, aside,
+    header, footer or anything that smells like related links; lazy-loaded and srcset images included."""
+    roots = doc.xpath("//article | //main") or [doc]
+    out, seen = [], set()
+    for root in roots:
+        for el in root.iter("img", "source"):
+            par = el.getparent()
+            if el.tag == "source" and (par is None or par.tag != "picture"):
+                continue                      # <video>/<audio> sources are not pictures
+            anc = el
+            bad = False
+            while anc is not None and anc is not root:
+                tag = anc.tag if isinstance(anc.tag, str) else ""
+                if tag in ("nav", "aside", "header", "footer", "form", "noscript", "button", "a") and tag != "a":
+                    bad = True; break
+                cls = (anc.get("class") or "") + " " + (anc.get("id") or "")
+                if tag in ("nav", "aside", "header", "footer", "form") or BAD_ZONE.search(cls):
+                    bad = True; break
+                anc = anc.getparent()
+            if bad:
+                continue
+            src = None
+            for attr in ("srcset", "data-srcset"):
+                if el.get(attr):
+                    src = _biggest_from_srcset(el.get(attr)); break
+            if not src:
+                for attr in ("data-src", "data-lazy-src", "data-original", "src"):
+                    if el.get(attr) and not el.get(attr).startswith("data:"):
+                        src = el.get(attr); break
+            if not src or src.startswith("data:") or BAD_IMG.search(src) or BAD_MEDIA.search(src):
+                continue
+            try:
+                w = int(re.sub(r"\D", "", el.get("width") or "0") or 0)
+                h = int(re.sub(r"\D", "", el.get("height") or "0") or 0)
+            except ValueError:
+                w = h = 0
+            if (w and w < 300) or (h and h < 200):
+                continue
+            src = urljoin(base_url, src)
+            key = _img_key(src)
+            if key in seen:
+                continue
+            seen.add(key)
+            alt = (el.get("alt") or "").strip()
+            if not alt and el.tag == "source":
+                sib = el.getparent().find(".//img") if el.getparent() is not None else None
+                alt = (sib.get("alt") or "").strip() if sib is not None else ""
+            fig = el
+            cap = ""
+            for _ in range(4):
+                fig = fig.getparent()
+                if fig is None:
+                    break
+                fc = fig.find(".//figcaption")
+                if fc is not None:
+                    cap = " ".join(fc.itertext()).strip(); break
+            out.append({"src": src, "alt": alt[:200], "caption": cap[:300]})
+            if len(out) >= limit:
+                return out
+    return out
+
+def sanitize_article(html_text, base_url):
+    """Keep only simple tags from the extractor's HTML, absolutize image URLs, drop the title."""
+    from lxml import html as LH
+    try:
+        doc = LH.fromstring(html_text)
+    except Exception:
+        return "", ""
+    for bad in doc.xpath("//script|//style|//iframe|//form|//noscript|//h1|//object|//embed|//video|//audio|//svg"):
+        bad.drop_tree()
+    for el in list(doc.iter()):
+        if not isinstance(el.tag, str):
+            continue
+        if el.tag == "img":
+            src = el.get("src") or el.get("data-src") or ""
+            if not src or src.startswith("data:") or BAD_IMG.search(src):
+                el.drop_tree(); continue
+            el.attrib.clear(); el.set("src", urljoin(base_url, src))
+            if el.getparent() is not None and el.getparent().tag == "figure":
+                pass
+            continue
+        if el.tag in ("html", "body"):
+            continue
+        if el.tag in ALLOWED_TAGS:
+            keep_alt = el.get("alt")
+            el.attrib.clear()
+            if keep_alt and el.tag == "img":
+                el.set("alt", keep_alt[:200])
+        else:
+            el.drop_tag()   # unwrap: keep the text, lose the tag
+    body = doc.find("body") if doc.tag == "html" else doc
+    if body is None:
+        body = doc
+    inner = "".join(LH.tostring(c, encoding="unicode") if isinstance(c.tag, str) else "" for c in body) if len(body) else ""
+    if body.text and body.text.strip():
+        inner = "<p>" + html.escape(body.text.strip()) + "</p>" + inner
+    text = " ".join(body.itertext()).strip()
+    return inner, text
+
 def article_text(url):
-    """Visit the story and return its readable text (paragraphs separated by blank lines), or None.
+    """Visit the story and return {'html', 'text', 'images'} or None: readable text with the pictures
+    the extractor kept in place, plus other content photos found on the page (with captions).
     Honest UA, 12 s, 1.5 MB cap. A short result means a teaser or a blocked page: treated as none."""
     if trafilatura is None:
         return None
@@ -210,10 +342,22 @@ def article_text(url):
         if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
             return None
         html_text = r.raw.read(1_500_000, decode_content=True).decode(r.encoding or "utf-8", "ignore")
-        txt = trafilatura.extract(html_text, url=url, include_comments=False, include_tables=False, favor_precision=True)
-        if not txt or len(txt) < 400:
+        out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
+                                  include_comments=False, include_tables=False, favor_precision=True)
+        if not out:
             return None
-        return txt[:MAX_ARTICLE_CHARS]
+        body_html, text = sanitize_article(out, url)
+        if len(text) < 400:
+            return None
+        images = []
+        try:
+            from lxml import html as LH
+            images = page_images(LH.fromstring(html_text), url)
+        except Exception:
+            images = []
+        inline_keys = {_img_key(u) for u in re.findall(r'src="([^"]+)"', body_html)}
+        images = [im for im in images if _img_key(im["src"]) not in inline_keys]
+        return {"html": body_html[:MAX_ARTICLE_CHARS * 2], "text": text[:MAX_ARTICLE_CHARS], "images": images}
     except Exception:
         return None
 
@@ -331,19 +475,28 @@ def main():
     # 4b. full text for new stories (newest first, bounded); kept in the cache next to the store
     os.makedirs(ARTICLES_DIR, exist_ok=True)
     abudget = int(os.environ.get("ARTICLE_BUDGET", "250"))
-    want = [v for v in store["items"].values() if not os.path.exists(os.path.join(ARTICLES_DIR, v["id"] + ".json"))
-            and by_id.get(v["source"], {}).get("fulltext", True)
-            and dt.datetime.fromisoformat(v["published"]) >= NOW - dt.timedelta(days=PUBLISH_DAYS)]
-    want.sort(key=lambda r: r["published"], reverse=True)
-    want = want[:abudget]
+    def _article_state(iid):
+        ap = os.path.join(ARTICLES_DIR, iid + ".json")
+        if not os.path.exists(ap):
+            return 0                      # never fetched
+        rec = load_json(ap, {})
+        if rec.get("v", 1) >= ARTICLE_VERSION or not rec.get("text"):
+            return 2                      # current, or known-unreadable: leave it
+        return 1                          # older text-only record: refresh when there is room
+    cands = [v for v in store["items"].values() if by_id.get(v["source"], {}).get("fulltext", True)
+             and dt.datetime.fromisoformat(v["published"]) >= NOW - dt.timedelta(days=PUBLISH_DAYS)]
+    cands = [(v, _article_state(v["id"])) for v in cands]
+    fresh = sorted([v for v, st in cands if st == 0], key=lambda r: r["published"], reverse=True)
+    stale = sorted([v for v, st in cands if st == 1], key=lambda r: r["published"], reverse=True)
+    want = (fresh + stale)[:abudget]
     got = 0
     if want:
         with cf.ThreadPoolExecutor(max_workers=12) as ex:
-            for rec, txt in zip(want, ex.map(lambda r: article_text(r["url"]), want)):
+            for rec, art in zip(want, ex.map(lambda r: article_text(r["url"]), want)):
                 with open(os.path.join(ARTICLES_DIR, rec["id"] + ".json"), "w", encoding="utf-8") as f:
-                    json.dump({"text": txt, "fetched": NOW.isoformat()}, f, ensure_ascii=False)
-                got += bool(txt)
-        log(f"full text fetched for {len(want)} stories, readable: {got}")
+                    json.dump(dict(art or {"text": None}, v=ARTICLE_VERSION, fetched=NOW.isoformat()), f, ensure_ascii=False)
+                got += bool(art)
+        log(f"full text fetched for {len(want)} stories, readable: {got}, with extra pictures: {sum(1 for _ in want)}")
     for name in os.listdir(ARTICLES_DIR):
         if name[:-5] not in store["items"]:
             os.remove(os.path.join(ARTICLES_DIR, name))
@@ -379,10 +532,13 @@ def main():
     readable = 0
     for r in items:
         ap = os.path.join(ARTICLES_DIR, r["id"] + ".json")
-        txt = load_json(ap, {}).get("text") if os.path.exists(ap) else None
+        art = load_json(ap, {}) if os.path.exists(ap) else {}
+        txt = art.get("text")
         if not txt:
             continue
-        body = json.dumps({"id": r["id"], "text": txt}, ensure_ascii=False).encode("utf-8")
+        hero = _img_key(r["image"]) if r.get("image") else None
+        images = [im for im in art.get("images", []) if _img_key(im["src"]) != hero]
+        body = json.dumps({"id": r["id"], "text": txt, "html": art.get("html"), "images": images}, ensure_ascii=False).encode("utf-8")
         with open(os.path.join(adir, r["id"] + (".bin" if ckey else ".json")), "wb") as f:
             f.write(encrypt_with_key(body, ckey) if ckey else body)
         r["reader"] = len(txt.split())
