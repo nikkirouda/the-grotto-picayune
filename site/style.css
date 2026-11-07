@@ -92,7 +92,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 .gate { max-width: 420px; margin: 60px auto; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
 .gate form { display: flex; gap: 8px; }
 .gate input { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
-.gate button, .drawer button:not(.icon-btn), .btn-like { background: var(--accent); color: var(--accent-ink); border: 0; padding: 8px 14px; border-radius: 8px; }
+.gate button, .drawer button:not(.icon-btn), .welcome button, .btn-like { background: var(--accent); color: var(--accent-ink); border: 0; padding: 8px 14px; border-radius: 8px; }
 .drawer button.danger { background: var(--dislike); color: #fff; }
 
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100%); background: var(--bg); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .25s ease; z-index: 30; display: flex; flex-direction: column; }
@@ -158,3 +158,16 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 #readerText figcaption { font-family: var(--sans); font-size: .82rem; color: var(--muted); margin-top: 6px; }
 #readerText blockquote { margin: 1em 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .gallery { margin-top: 1.5em; border-top: 1px solid var(--line); padding-top: 6px; }
+
+.welcome { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45); overflow-y: auto; padding: 24px 12px; }
+.welcome-card { max-width: 640px; margin: 0 auto; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 20px 20px 24px; box-shadow: var(--shadow); }
+.welcome-card h2 { font-family: var(--font); margin: 0 0 8px; font-size: 1.6rem; }
+.welcome-card h3 { font-family: var(--font); margin: 20px 0 4px; font-size: 1.15rem; }
+.defaults { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: .92rem; }
+.defaults p { margin: 4px 0; }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; font-size: .9rem; }
+.checks label { display: flex; gap: 6px; align-items: center; }
+.chips .pick { border-style: dashed; }
+.welcome-actions { margin-top: 18px; }
+.welcome button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.welcome .chip.place::before { content: "📍 "; }

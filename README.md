@@ -79,6 +79,16 @@ site/ (index.html, app.js) ──► GitHub Pages
   NEWS_PASSPHRASE=… python3 build/private.py put --from p.json && git commit -am "private: …"
   ```
 
+## Sharing it with friends and family
+
+Give them the address and the passphrase. On their first visit the page shows a welcome step: what the
+paper currently chooses by default (places, sections, favoured and excluded words), then asks for their
+own places (looked up for weather; each becomes a tab with every story that mentions it), which
+sections to keep, and a starting list of words to see more or none of. Their choices live in their
+browser only; the owner's setup is the starting point and is never changed by a reader. They can reopen
+the welcome from ⚙ → *This device*. Do not give readers a GitHub token: that is the owner's write
+access.
+
 ## Local run
 
 ```bash

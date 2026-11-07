@@ -66,6 +66,7 @@ function compilePrefs() {
   boostRe = prefs.boosted_terms && prefs.boosted_terms.length ? new RegExp('(?<![\\w])(?:' + prefs.boosted_terms.map(x => x.trim()).filter(Boolean).map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')).join('|') + ')(?![\\w])', 'gi') : null;
   lensRes = {};
   for (const s of prefs.sections || []) if (s.match && s.match.length) lensRes[s.id] = termRegex(s.match);
+  compileLocalLenses();
 }
 function savePrefsLocal(patch) {
   const local = Object.assign(LS.get('prefsLocal', {}), patch, { _edited: Date.now() });
@@ -165,20 +166,27 @@ const bytesToB64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x800
 const b64ToBytes = s => Uint8Array.from(atob(s.replace(/\s/g, '')), c => c.charCodeAt(0));
 
 // ------------------------------------------------------------- routing & lists
+function allPlaces() { return [...(prefs.places || []), ...(prefs.local_places || [])]; }
+function hiddenSet() { return new Set(prefs.hidden_sections || []); }
 function sectionsForRoute() {
   if (route.startsWith('place:')) {
-    const p = (prefs.places || []).find(x => x.id === route.slice(6));
-    return p ? p.sections : [];
+    const p = allPlaces().find(x => x.id === route.slice(6));
+    return p ? (p.sections || [route]) : [];
   }
   return [route];
+}
+function compileLocalLenses() {
+  for (const p of prefs.local_places || []) if (p.match && p.match.length) lensRes['place:' + p.id] = termRegex(p.match);
 }
 function visibleItems() {
   const muted = new Set(prefs.muted_sources || []);
   const hideAt = typeof prefs.hide_threshold === 'number' ? prefs.hide_threshold : -2;
   let blocked = 0, hidden = 0;
   const out = [];
+  const hid = hiddenSet();
   for (const it of bundle.items) {
     if (muted.has(it.source)) continue;
+    if (hid.size && (hid.has(it.section) || (it.place && hid.has('place:' + it.place)))) continue;
     if (blockedRe && blockedRe.test(it._text)) { blocked++; continue; }
     const sc = score(it);
     if (!opts.showHidden && sc.L.total <= hideAt && !votes[it.id]) { hidden++; continue; }
@@ -209,7 +217,7 @@ function buildList() {
   } else if (route !== 'foryou') {
     const secs = sectionsForRoute();
     list = out.filter(it => inSection(it, secs));
-    const p = (prefs.places || []).find(x => 'place:' + x.id === route);
+    const p = allPlaces().find(x => 'place:' + x.id === route);
     const s = (prefs.sections || []).find(x => x.id === route);
     title = p ? p.name : s ? s.name : route;
   }
@@ -238,7 +246,8 @@ function renderMore() {
   shown += slice.length;
   $('#cards').appendChild(frag);
   $('#moreBtn').classList.toggle('hidden', shown >= currentList.length);
-  setStatus(currentList.length ? '' : 'Nothing here yet.');
+  const lp = route.startsWith('place:') && (prefs.local_places || []).find(p => 'place:' + p.id === route);
+  setStatus(currentList.length ? '' : lp ? `No story this week mentions ${lp.name.split(',')[0]}. The sources are the owner's list; ask them to add local ones for this place.` : 'Nothing here yet.');
 }
 function card(it, lead) {
   const n = $('#cardTpl').content.firstElementChild.cloneNode(true);
@@ -311,6 +320,8 @@ async function openReader(it, n) {
       $('#readerText').insertAdjacentHTML('beforeend', `<div class="gallery"><h3>More pictures from the story</h3>${extra.map(im => `<figure><img src="${esc(im.src)}" alt="${esc(im.alt)}" loading="lazy" referrerpolicy="no-referrer"><figcaption>${esc(im.caption || im.alt)}</figcaption></figure>`).join('')}</div>`);
     }
     $$('#readerText img').forEach(im => { im.loading = 'lazy'; im.referrerPolicy = 'no-referrer'; im.onerror = () => { const f = im.closest('figure'); (f || im).remove(); }; });
+    const first = $('#readerText').firstElementChild;
+    if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
   } catch (e) {
     $('#readerText').innerHTML = `<p class="muted">The text is not in the paper. <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a></p>`;
@@ -359,13 +370,26 @@ function vote(it, v, n) {
 function setStatus(t) { const s = $('#status'); s.textContent = t; s.classList.toggle('hidden', !t); }
 
 // ------------------------------------------------------------- weather
+async function localWeather(p) {
+  const cache = LS.get('wx:' + p.id, null);
+  if (cache && Date.now() - cache.t < 30 * 60e3) return cache.w;
+  try {
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&timezone=auto&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&temperature_unit=fahrenheit&forecast_days=3`;
+    const d = await fetch(u).then(r => r.json());
+    const w = { temp: d.current.temperature_2m, code: d.current.weather_code, days: d.daily.time.map((t, i) => ({ date: t, hi: d.daily.temperature_2m_max[i], lo: d.daily.temperature_2m_min[i], pop: d.daily.precipitation_probability_max[i], code: d.daily.weather_code[i] })) };
+    LS.set('wx:' + p.id, { t: Date.now(), w }); return w;
+  } catch { return null; }
+}
 function renderWeather() {
   const w = $('#weather'); w.innerHTML = '';
   let places = [];
-  if (route.startsWith('place:')) places = (prefs.places || []).filter(p => 'place:' + p.id === route);
-  else if (route === 'foryou' && !query) places = (prefs.places || []).slice(0, 1);
-  const cards = places.filter(p => bundle.weather && bundle.weather[p.id]).map(p => {
-    const x = bundle.weather[p.id];
+  const hidden = hiddenSet();
+  if (route.startsWith('place:')) places = allPlaces().filter(p => 'place:' + p.id === route);
+  else if (route === 'foryou' && !query) places = allPlaces().filter(p => !hidden.has('place:' + p.id)).slice(0, 1);
+  const wxFor = p => (bundle.weather && bundle.weather[p.id]) || null;
+  for (const p of places) if (!wxFor(p) && p.lat != null) localWeather(p).then(x => { if (x && !bundle.weather[p.id]) { bundle.weather[p.id] = x; if (places.includes(p)) renderWeather(); } });
+  const cards = places.filter(p => wxFor(p)).map(p => {
+    const x = wxFor(p);
     const days = (x.days || []).slice(0, 3).map((d, i) => `<span>${i === 0 ? 'Today' : new Date(d.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short' })} <b>${Math.round(d.hi)}°</b>/${Math.round(d.lo)}°${d.pop != null ? ` · ${d.pop}%` : ''}</span>`).join('');
     return `<div class="wx"><div class="place">${esc(p.name)}</div><div class="now">${Math.round(x.temp)}°F <span class="muted small">${esc(WX[x.code] || '')}</span></div><div class="days">${days}</div></div>`;
   });
@@ -378,10 +402,11 @@ function renderTabs() {
   const t = $('#tabs');
   const link = (id, name) => `<a href="#/${id}" data-r="${id}" class="${route === id ? 'active' : ''}">${esc(name)}</a>`;
   const placeSecs = new Set((prefs.places || []).map(p => p.sections[0]));
+  const hidden = hiddenSet();
   let h = link('foryou', 'For you') + link('latest', 'Latest') + '<span class="sep"></span>';
-  h += (prefs.places || []).map(p => link('place:' + p.id, p.name.split(',')[0].replace(' & New England', ''))).join('');
+  h += allPlaces().filter(p => !hidden.has('place:' + p.id)).map(p => link('place:' + p.id, p.name.split(',')[0].replace(' & New England', ''))).join('');
   h += '<span class="sep"></span>';
-  h += (prefs.sections || []).filter(s => !placeSecs.has(s.id)).map(s => link(s.id, s.name)).join('');
+  h += (prefs.sections || []).filter(s => !placeSecs.has(s.id) && !hidden.has(s.id)).map(s => link(s.id, s.name)).join('');
   t.innerHTML = h;
   const a = $('#tabs a.active'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
@@ -393,6 +418,69 @@ function go() {
 }
 
 // ------------------------------------------------------------- settings drawer
+// ------------------------------------------------------------- welcome (first visit on a device)
+let wDraft = null;
+function describeDefaults() {
+  const places = (prefs.places || []).map(p => p.name).join(', ');
+  const secs = (prefs.sections || []).map(x => x.name).join(', ');
+  const ex = prefs.blocked_terms || [], fav = prefs.boosted_terms || [];
+  const few = a => a.slice(0, 6).join(', ') + (a.length > 6 ? ` … (${a.length} in all)` : '');
+  return `<p><b>Places:</b> ${esc(places) || '—'}</p><p><b>Sections:</b> ${esc(secs)}</p><p><b>Favoured words:</b> ${esc(few(fav)) || '—'}</p><p><b>Left out:</b> ${esc(few(ex)) || '—'}</p><p class="muted small">Sources are the owner's list; anything behind a paywall or login was never included.</p>`;
+}
+function openWelcome() {
+  wDraft = {
+    local_places: JSON.parse(JSON.stringify(prefs.local_places || [])),
+    hidden_sections: [...(prefs.hidden_sections || [])],
+    boosted_terms: [...(prefs.boosted_terms || [])],
+    blocked_terms: [...(prefs.blocked_terms || [])],
+  };
+  $('#welcomeDefaults').innerHTML = describeDefaults();
+  fillWelcome();
+  $('#welcome').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+}
+function fillWelcome() {
+  const chipList = (el, list, onRemove, cls = '') => {
+    el.innerHTML = list.map((t, i) => `<span class="chip ${cls}" data-i="${i}">${esc(t)}</span>`).join('') || '<span class="muted small">nothing yet</span>';
+    $$('.chip', el).forEach(c => c.onclick = () => onRemove(+c.dataset.i));
+  };
+  chipList($('#wPlaceChips'), wDraft.local_places.map(p => p.name), i => { wDraft.local_places.splice(i, 1); fillWelcome(); }, 'place');
+  chipList($('#wBoostChips'), wDraft.boosted_terms, i => { wDraft.boosted_terms.splice(i, 1); fillWelcome(); });
+  chipList($('#wBlockChips'), wDraft.blocked_terms, i => { wDraft.blocked_terms.splice(i, 1); fillWelcome(); });
+  const hidden = new Set(wDraft.hidden_sections);
+  const placeSecs = new Set((prefs.places || []).map(p => p.sections[0]));
+  const rows = [...(prefs.places || []).map(p => ({ id: 'place:' + p.id, name: p.name })), ...(prefs.sections || []).filter(x => !placeSecs.has(x.id))];
+  $('#wSections').innerHTML = rows.map(r => `<label><input type="checkbox" data-id="${esc(r.id)}" ${hidden.has(r.id) ? '' : 'checked'}> ${esc(r.name)}</label>`).join('');
+  $$('#wSections input').forEach(cb => cb.onchange = () => { const h = new Set(wDraft.hidden_sections); cb.checked ? h.delete(cb.dataset.id) : h.add(cb.dataset.id); wDraft.hidden_sections = [...h]; });
+}
+async function findPlace(q) {
+  const el = $('#wPlaceResults'); el.innerHTML = '<span class="muted small">Looking…</span>';
+  try {
+    const d = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`).then(r => r.json());
+    const hits = d.results || [];
+    el.innerHTML = hits.map((h, i) => `<span class="chip pick" data-i="${i}">${esc(h.name)}${h.admin1 ? ', ' + esc(h.admin1) : ''}, ${esc(h.country_code || h.country || '')}</span>`).join('') || '<span class="muted small">No match. Try another spelling.</span>';
+    $$('.chip', el).forEach(c => c.onclick = () => {
+      const h = hits[+c.dataset.i];
+      const id = 'l' + Math.abs([...(h.name + h.latitude)].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7)).toString(36);
+      if (!wDraft.local_places.some(p => p.id === id)) wDraft.local_places.push({ id, name: h.admin1 ? `${h.name}, ${h.admin1}` : h.name, lat: h.latitude, lon: h.longitude, match: [h.name] });
+      el.innerHTML = ''; $('#wPlace').value = ''; fillWelcome();
+    });
+  } catch { el.innerHTML = '<span class="muted small">The place lookup did not answer; try again in a moment.</span>'; }
+}
+function closeWelcome(save) {
+  if (save) savePrefsLocal(wDraft);
+  LS.set('welcomed', true);
+  $('#welcome').classList.add('hidden'); document.body.style.overflow = '';
+  renderTabs(); buildList();
+}
+function wireWelcome() {
+  $('#wPlaceForm').onsubmit = e => { e.preventDefault(); const q = $('#wPlace').value.trim(); if (q) findPlace(q); };
+  const addTo = (key, inputId) => e => { e.preventDefault(); const v = $(inputId).value.trim(); if (!v) return; if (!wDraft[key].some(x => x.toLowerCase() === v.toLowerCase())) wDraft[key].push(v); $(inputId).value = ''; fillWelcome(); };
+  $('#wBoostForm').onsubmit = addTo('boosted_terms', '#wBoost');
+  $('#wBlockForm').onsubmit = addTo('blocked_terms', '#wBlock');
+  $('#wDone').onclick = () => closeWelcome(true);
+  $('#wKeep').onclick = () => closeWelcome(false);
+  $('#rerunWelcome').onclick = () => { openSettings(false); openWelcome(); };
+}
 function openSettings(open) { if (open) openTopics(false); $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) fillSettings(); }
 function openTopics(open) { if (open) openSettings(false); $('#topics').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#topics').setAttribute('aria-hidden', String(!open)); if (open) { fillTopics(); setTimeout(() => $('#addBoost input').focus(), 250); } }
 function countHits(term) {
@@ -549,10 +637,11 @@ async function rebuild() {
 (async function boot() {
   const theme = LS.get('theme', null); if (theme) document.documentElement.dataset.theme = theme;
   document.body.classList.toggle('compact', opts.compact);
-  wireSettings();
+  wireSettings(); wireWelcome();
   window.addEventListener('hashchange', go);
   try { await loadBundle(); } catch (e) { setStatus('The news bundle is not here yet. The first build publishes it within a few minutes.'); console.error(e); return; }
   renderTabs(); buildList();
+  if (!LS.get('welcomed', false) && !LS.get('prefsLocal', null) && !Object.keys(votes).length) openWelcome();
   if (LS.get('token', '') && Date.now() - LS.get('lastSync', 0) > 10 * 60e3) sync(false);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

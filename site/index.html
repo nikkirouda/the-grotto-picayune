@@ -97,6 +97,12 @@
     </details>
 
     <details>
+      <summary>This device</summary>
+      <p class="muted small">Your places and sections on this device. The owner's setup is the starting point; everything here is local unless you sync.</p>
+      <button id="rerunWelcome">Open the welcome page again</button>
+    </details>
+
+    <details>
       <summary>Backup</summary>
       <div class="row"><button id="exportBtn">Export votes &amp; preferences</button><label class="btn-like">Import<input type="file" id="importFile" accept="application/json" hidden></label></div>
       <button id="forgetPass" class="hidden">Forget passphrase on this device</button>
@@ -125,6 +131,30 @@
   </div>
 </aside>
 <div id="scrim" class="scrim"></div>
+
+<div id="welcome" class="welcome hidden" role="dialog" aria-modal="true" aria-label="Welcome">
+  <div class="welcome-card">
+    <h2>Welcome to the paper</h2>
+    <p>This page is set up for its owner. On this device you can keep those choices, trim them, or add your own; nothing you change here touches anyone else's copy.</p>
+    <div id="welcomeDefaults" class="defaults"></div>
+    <h3>Places you care about</h3>
+    <p class="muted small">Type a town or city and pick it from the list. Each one gets a tab with its weather and every story that mentions it.</p>
+    <form class="add" id="wPlaceForm"><input id="wPlace" placeholder="e.g. Munich, Portland, Oxford" autocomplete="off"><button type="submit">Find</button></form>
+    <div id="wPlaceResults" class="chips"></div>
+    <div id="wPlaceChips" class="chips"></div>
+    <h3>Sections to keep</h3>
+    <p class="muted small">Untick what you'd rather not see; those stories leave every tab, including For you.</p>
+    <div id="wSections" class="checks"></div>
+    <h3>More of this</h3>
+    <form class="add" id="wBoostForm"><input id="wBoost" placeholder="a word or phrase, then Add" autocomplete="off"><button type="submit">Add</button></form>
+    <div id="wBoostChips" class="chips"></div>
+    <h3>None of this</h3>
+    <form class="add" id="wBlockForm"><input id="wBlock" placeholder="a word or phrase, then Add" autocomplete="off"><button type="submit">Add</button></form>
+    <div id="wBlockChips" class="chips"></div>
+    <p class="muted small">You can change any of this later: ★ for topics, ⚙ for everything else, 👍 👎 on any story.</p>
+    <div class="row welcome-actions"><button id="wDone">Start reading</button><button id="wKeep" class="secondary">Keep everything as it is</button></div>
+  </div>
+</div>
 
 <div id="reader" class="reader hidden" role="dialog" aria-modal="true" aria-label="Story">
   <div class="reader-bar">
