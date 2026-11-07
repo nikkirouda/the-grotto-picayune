@@ -651,6 +651,7 @@ def main():
         "prefs": prefs,
         "feedback": feedback,
         "sources": [{"id": s["id"], "name": s["name"], "home": s.get("home"), "section": s["section"], "weight": s.get("weight", 1.0),
+                     "publication": s.get("publication"), "pubname": s.get("pubname"), "paywalled": bool(s.get("paywalled")),
                      "health": store["health"].get(s["id"], {}).get("last_status")} for s in feeds],
         "stats": {"stories": len(out_items), "new": len(new_ids), "sources_ok": sum(1 for s in feeds if (results.get(s["id"]) or (None, ""))[1].startswith(("ok", "unchanged")))},
     }

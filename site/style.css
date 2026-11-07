@@ -173,3 +173,6 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 .welcome .chip.place::before { content: "📍 "; }
 
 .meta .kind { color: var(--muted); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.icon-btn.busy { animation: spin 1s linear infinite; }

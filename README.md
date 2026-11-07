@@ -66,6 +66,9 @@ site/ (index.html, app.js) ──► GitHub Pages
 
 ## Everyday
 
+- The paper is gathered on GitHub's clock (17 past each hour) and every opening shows the newest edition.
+  ↻ up top pulls a newer edition into a page that has been sitting open; the page also checks on its own
+  when it comes back to the front. With the owner's token, a second tap of ↻ gathers a fresh edition now.
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.
 - ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
   matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
@@ -78,6 +81,15 @@ site/ (index.html, app.js) ──► GitHub Pages
   NEWS_PASSPHRASE=… python3 build/private.py show > p.json   # edit p.json
   NEWS_PASSPHRASE=… python3 build/private.py put --from p.json && git commit -am "private: …"
   ```
+
+## Subscriber publications
+
+Papers and magazines behind a paywall (the Times, the Economist, the FT, the Journal, the Post, the
+Atlantic, the New Yorker) publish free headline feeds. They are in `feeds.yml` marked `paywalled: true`
+and are never fetched in full. A reader ticks the ones they pay for (welcome page, or ⚙ → Publications);
+their headlines and summaries then join the paper, each gets a tab, and every story opens at the
+publisher's site where the reader's own sign-in applies. The paper never asks for, stores or uses
+anyone's login: that would break the publishers' terms and could cost the subscriber their account.
 
 ## Sharing it with friends and family
 

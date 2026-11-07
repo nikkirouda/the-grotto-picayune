@@ -169,6 +169,12 @@ const b64ToBytes = s => Uint8Array.from(atob(s.replace(/\s/g, '')), c => c.charC
 
 // ------------------------------------------------------------- routing & lists
 function allPlaces() { return [...(prefs.places || []), ...(prefs.local_places || [])]; }
+function publications() {
+  const m = new Map();
+  for (const src of bundle.sources || []) if (src.publication && !m.has(src.publication)) m.set(src.publication, { id: src.publication, name: src.pubname || src.name });
+  return [...m.values()];
+}
+function subscribedSet() { return new Set(prefs.subscriptions || []); }
 function hiddenSet() { return new Set(prefs.hidden_sections || []); }
 function sectionsForRoute() {
   if (route.startsWith('place:')) {
@@ -186,8 +192,11 @@ function visibleItems() {
   let blocked = 0, hidden = 0;
   const out = [];
   const hid = hiddenSet();
+  const subs = subscribedSet();
   for (const it of bundle.items) {
     if (muted.has(it.source)) continue;
+    const srcInfo = sourceById[it.source] || {};
+    if (srcInfo.paywalled && !subs.has(srcInfo.publication)) continue;
     if (hid.size && (hid.has(it.section) || (it.place && hid.has('place:' + it.place)))) continue;
     if (blockedRe && blockedRe.test(it._text)) { blocked++; continue; }
     const sc = score(it);
@@ -222,7 +231,8 @@ function buildList() {
     list = out.filter(it => inSection(it, secs));
     const p = allPlaces().find(x => 'place:' + x.id === route);
     const s = (prefs.sections || []).find(x => x.id === route);
-    title = p ? p.name : s ? s.name : route;
+    const pub = route.startsWith('pub:') && publications().find(x => 'pub:' + x.id === route);
+    title = p ? p.name : s ? s.name : pub ? pub.name : route;
   }
   const bySort = (opts.sort === 'time' || route === 'latest') ? (a, b) => new Date(b.published) - new Date(a.published) : (a, b) => b._sc.value - a._sc.value;
   list.sort(bySort);
@@ -270,6 +280,7 @@ function card(it, lead) {
   $('.why', n).textContent = whyText(it._sc, it);
   $$('a', n).forEach(a => a.addEventListener('click', () => markRead(it, n)));
   if (it.kind === 'video') { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· video/audio'; $('.meta', n).appendChild(b); }
+  if (src.paywalled) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· subscriber, opens at the source'; $('.meta', n).appendChild(b); }
   if (it.reader) {
     $('.rd', n).textContent = '· in the paper';
     for (const a of [$('.title', n), $('.thumb', n)]) a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); openReader(it, n); });
@@ -388,6 +399,32 @@ function vote(it, v, n) {
   scheduleSync();
 }
 function setStatus(t) { const s = $('#status'); s.textContent = t; s.classList.toggle('hidden', !t); }
+let flashTimer = null;
+function flash(t, ms = 5000) { setStatus(t); clearTimeout(flashTimer); flashTimer = setTimeout(() => { if ($('#status').textContent === t) setStatus(''); }, ms); }
+
+// ------------------------------------------------------------- refresh: the paper is gathered on GitHub's clock;
+// this pulls the newest edition into an open page (and the page checks on its own when it comes back to the front)
+let lastCheck = 0, lastManual = 0;
+async function refreshNews(manual) {
+  const btn = $('#refreshBtn');
+  if (btn.classList.contains('busy')) return;
+  btn.classList.add('busy'); lastCheck = Date.now();
+  try {
+    const mf = await fetch('data/manifest.json', { cache: 'no-store' }).then(r => r.json());
+    if (mf.generated !== manifest.generated) {
+      const had = new Set(bundle.items.map(i => i.id));
+      await loadBundle();
+      const fresh = bundle.items.filter(i => !had.has(i.id)).length;
+      renderTabs(); buildList();
+      flash(`Fresh edition: ${fresh} new stor${fresh === 1 ? 'y' : 'ies'} since you opened the paper.`);
+    } else if (manual) {
+      const token = LS.get('token', '');
+      if (token && Date.now() - lastManual < 6000) { lastManual = 0; await rebuild(); flash($('#syncMsg').textContent || 'Rebuild started.', 8000); }
+      else { lastManual = Date.now(); flash(`Up to date: this edition was gathered ${ago(manifest.generated)}; the next is gathered at 17 past each hour.${token ? ' Tap ↻ again to gather one now.' : ''}`, 7000); }
+    }
+  } catch (e) { if (manual) flash('Could not reach the paper just now.'); }
+  btn.classList.remove('busy');
+}
 
 // ------------------------------------------------------------- weather
 async function localWeather(p) {
@@ -427,6 +464,9 @@ function renderTabs() {
   h += allPlaces().filter(p => !hidden.has('place:' + p.id)).map(p => link('place:' + p.id, p.name.split(',')[0].replace(' & New England', ''))).join('');
   h += '<span class="sep"></span>';
   h += (prefs.sections || []).filter(s => !placeSecs.has(s.id) && !hidden.has(s.id)).map(s => link(s.id, s.name)).join('');
+  const subs = subscribedSet();
+  const pubs = publications().filter(x => subs.has(x.id));
+  if (pubs.length) h += '<span class="sep"></span>' + pubs.map(x => link('pub:' + x.id, x.name.replace(/^The /, ''))).join('');
   t.innerHTML = h;
   const a = $('#tabs a.active'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
@@ -445,7 +485,8 @@ function describeDefaults() {
   const secs = (prefs.sections || []).map(x => x.name).join(', ');
   const ex = prefs.blocked_terms || [], fav = prefs.boosted_terms || [];
   const few = a => a.slice(0, 6).join(', ') + (a.length > 6 ? ` … (${a.length} in all)` : '');
-  return `<p><b>Places:</b> ${esc(places) || '—'}</p><p><b>Sections:</b> ${esc(secs)}</p><p><b>Favoured words:</b> ${esc(few(fav)) || '—'}</p><p><b>Left out:</b> ${esc(few(ex)) || '—'}</p><p class="muted small">Sources are the owner's list; anything behind a paywall or login was never included.</p>`;
+  const subs = publications().filter(x => (prefs.subscriptions || []).includes(x.id)).map(x => x.name).join(', ');
+  return `<p><b>Places:</b> ${esc(places) || '—'}</p><p><b>Sections:</b> ${esc(secs)}</p><p><b>Subscriber publications:</b> ${esc(subs) || 'none ticked'}</p><p><b>Favoured words:</b> ${esc(few(fav)) || '—'}</p><p><b>Left out:</b> ${esc(few(ex)) || '—'}</p><p class="muted small">Sources are the owner's list; anything behind a paywall or login was never included.</p>`;
 }
 function openWelcome() {
   wDraft = {
@@ -453,6 +494,7 @@ function openWelcome() {
     hidden_sections: [...(prefs.hidden_sections || [])],
     boosted_terms: [...(prefs.boosted_terms || [])],
     blocked_terms: [...(prefs.blocked_terms || [])],
+    subscriptions: [...(prefs.subscriptions || [])],
   };
   $('#welcomeDefaults').innerHTML = describeDefaults();
   fillWelcome();
@@ -469,6 +511,9 @@ function fillWelcome() {
   const hidden = new Set(wDraft.hidden_sections);
   const placeSecs = new Set((prefs.places || []).map(p => p.sections[0]));
   const rows = [...(prefs.places || []).map(p => ({ id: 'place:' + p.id, name: p.name })), ...(prefs.sections || []).filter(x => !placeSecs.has(x.id))];
+  const wsubs = new Set(wDraft.subscriptions);
+  $('#wSubs').innerHTML = publications().map(x => `<label><input type="checkbox" data-pub="${esc(x.id)}" ${wsubs.has(x.id) ? 'checked' : ''}> ${esc(x.name)}</label>`).join('') || '<span class="muted small">none in the source list</span>';
+  $$('#wSubs input').forEach(cb => cb.onchange = () => { const m = new Set(wDraft.subscriptions); cb.checked ? m.add(cb.dataset.pub) : m.delete(cb.dataset.pub); wDraft.subscriptions = [...m]; });
   $('#wSections').innerHTML = rows.map(r => `<label><input type="checkbox" data-id="${esc(r.id)}" ${hidden.has(r.id) ? '' : 'checked'}> ${esc(r.name)}</label>`).join('');
   $$('#wSections input').forEach(cb => cb.onchange = () => { const h = new Set(wDraft.hidden_sections); cb.checked ? h.delete(cb.dataset.id) : h.add(cb.dataset.id); wDraft.hidden_sections = [...h]; });
 }
@@ -543,6 +588,10 @@ function fillSettings() {
     const m = new Set(prefs.muted_sources || []); cb.checked ? m.delete(cb.dataset.src) : m.add(cb.dataset.src);
     savePrefsLocal({ muted_sources: Array.from(m) }); fillSettings(); buildList();
   });
+  const subs = subscribedSet();
+  $('#subList').innerHTML = publications().map(x => `<label><input type="checkbox" data-pub="${esc(x.id)}" ${subs.has(x.id) ? 'checked' : ''}> ${esc(x.name)}</label>`).join('') || '<span class="muted small">none in the source list</span>';
+  $('#subCount').textContent = `(${subs.size} ticked)`;
+  $$('#subList input').forEach(cb => cb.onchange = () => { const m = subscribedSet(); cb.checked ? m.add(cb.dataset.pub) : m.delete(cb.dataset.pub); savePrefsLocal({ subscriptions: [...m] }); fillSettings(); renderTabs(); buildList(); });
   $('#repo').value = LS.get('repo', guessRepo()); $('#token').value = LS.get('token', '');
   $('#buildInfo').textContent = `Built ${new Date(bundle.generated).toLocaleString()} · ${bundle.items.length} stories · ${(bundle.sources || []).length} sources`;
   fillLearned();
@@ -593,6 +642,8 @@ function wireSettings() {
   };
   $$('.sort button').forEach(b => b.onclick = () => { opts.sort = b.dataset.sort; LS.set('opts', opts); buildList(); });
   $('#moreBtn').onclick = renderMore;
+  $('#refreshBtn').onclick = () => refreshNews(true);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bundle && Date.now() - lastCheck > 10 * 60e3) refreshNews(false); });
   $('#readerBack').onclick = () => closeReader(false);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && readerItem) closeReader(false); });
   window.addEventListener('popstate', () => { if (readerItem && !location.hash.endsWith('/read')) closeReader(true); });

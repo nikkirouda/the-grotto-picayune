@@ -21,6 +21,7 @@
       <input id="q" type="search" placeholder="Search the week's stories" autocomplete="off" aria-label="Search">
     </form>
     <div class="tools">
+      <button class="icon-btn" id="refreshBtn" title="Pull in anything new" aria-label="Refresh">↻</button>
       <button class="icon-btn" id="topicsBtn" title="Topics: more of this, none of this" aria-label="Topics">★</button>
       <button class="icon-btn" id="themeBtn" title="Light / dark" aria-label="Toggle theme">◐</button>
       <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
@@ -98,6 +99,12 @@
     </details>
 
     <details>
+      <summary>Publications you subscribe to <span class="count" id="subCount"></span></summary>
+      <p class="muted small">Papers and magazines behind a paywall. Tick the ones you pay for: their headlines and summaries join the paper and get a tab, and each story opens at the publisher's site, where your own sign-in applies. The paper never asks for, stores or uses anyone's login.</p>
+      <div id="subList" class="checks"></div>
+    </details>
+
+    <details>
       <summary>This device</summary>
       <p class="muted small">Your places and sections on this device. The owner's setup is the starting point; everything here is local unless you sync.</p>
       <button id="rerunWelcome">Open the welcome page again</button>
@@ -146,6 +153,9 @@
     <h3>Sections to keep</h3>
     <p class="muted small">Untick what you'd rather not see; those stories leave every tab, including For you.</p>
     <div id="wSections" class="checks"></div>
+    <h3>Publications you subscribe to</h3>
+    <p class="muted small">Tick any you pay for. Their headlines join the paper; stories open at the publisher's site with your own sign-in. No login is ever asked for here.</p>
+    <div id="wSubs" class="checks"></div>
     <h3>More of this</h3>
     <form class="add" id="wBoostForm"><input id="wBoost" placeholder="a word or phrase, then Add" autocomplete="off"><button type="submit">Add</button></form>
     <div id="wBoostChips" class="chips"></div>
