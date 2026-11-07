@@ -200,11 +200,63 @@ def og_image(url):
     except Exception:
         return ""
 
-ARTICLE_VERSION = 2
+ARTICLE_VERSION = 3
 ALLOWED_TAGS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "strong", "em", "b", "i", "br", "img", "figure", "figcaption"}
 BAD_IMG = re.compile(r"logo|icon|avatar|sprite|badge|pixel|1x1|spacer|placeholder|emoji|\.svg(\?|$)|/ads?/|doubleclick|gravatar", re.I)
 BAD_MEDIA = re.compile(r"\.(mp4|m3u8|flv|webm|mov|mp3)(\?|$)|/video/|hlsvod|/flv/", re.I)
 BAD_ZONE = re.compile(r"related|recommend|teaser|promo|sidebar|footer|nav|share|comment|newsletter|subscribe|trending|popular|most-read|cookie|banner|author|byline|widget", re.I)
+
+PROMO_RE = re.compile(r"^(donate|subscribe|sign up|support (our|local|public|independent)|become a member|watch with|listen( now)?|read more|related|advertisement|sponsored|share this|follow us|more from|newsletter|get the .*newsletter|passport is)|newsletter|all rights reserved|cookie|privacy policy|terms of (use|service)", re.I)
+VIDEO_URL_RE = re.compile(r"/(video|videos|watch|podcast|podcasts|audio|listen|live|livestream|gallery|photos|slideshow)(/|$|\?)", re.I)
+VIDEO_TITLE_RE = re.compile(r"^(watch|video|listen|podcast|live|photos|in pictures|gallery)\b[:\s]|\b(\(video\)|\[video\]|\| video$|- video$)", re.I)
+PLACEHOLDER_RE = re.compile(r"placeholder|lqip|blur|data:image|/1x1|spacer|loading\.|\bw=\d{1,2}\b|[-_]\d{1,2}x\d{1,2}\.", re.I)
+
+def story_kind(url, title, html_text=None):
+    """'video' for video, audio, podcast, live and gallery pages; 'text' otherwise."""
+    if VIDEO_URL_RE.search(urlparse(url).path or "") or VIDEO_TITLE_RE.search(title or ""):
+        return "video"
+    if html_text:
+        head = html_text[:60_000]
+        if re.search(r'property=["\']og:type["\'][^>]+content=["\'](video|music)', head, re.I) or \
+           re.search(r'content=["\'](video|music)[^"\']*["\'][^>]+property=["\']og:type', head, re.I):
+            return "video"
+        if re.search(r'property=["\']og:video', head, re.I) and html_text.count("<video") > 0:
+            return "video"
+    return "text"
+
+def clean_paragraphs(text):
+    """Drop repeated and promotional paragraphs; return the cleaned paragraphs."""
+    out, seen = [], set()
+    for par in re.split(r"\n+", text):
+        par = par.strip()
+        if not par:
+            continue
+        key = re.sub(r"\W+", " ", par.lower()).strip()
+        if key in seen:
+            continue
+        if PROMO_RE.search(par) and len(par) < 240:
+            continue
+        seen.add(key)
+        out.append(par)
+    return out
+
+def looks_like_the_story(paragraphs, title, summary):
+    """The extracted text must read like an article and must be the article the feed described."""
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z'’-]{2,}", " ".join(paragraphs))]
+    if len(words) < 150:
+        return False, "too short"
+    long_pars = [p for p in paragraphs if len(p.split()) >= 15]
+    if len(long_pars) < 2:
+        return False, "no real paragraphs"
+    text_words = set(w.lower() for w in words)
+    probe = set(w.lower() for w in re.findall(r"[A-Za-z][A-Za-z'’-]{3,}", summary or "") if w.lower() not in STOP)
+    if len(probe) >= 8:
+        overlap = len(probe & text_words) / len(probe)
+        if overlap < 0.45:
+            return False, f"does not match the feed's summary ({overlap:.0%})"
+    return True, "ok"
+
+STOP = set("that with this from have were they their there which about after before while would could should these those been being into over under more most some such only also than then them when where what your will just like said says".split())
 
 def _biggest_from_srcset(srcset):
     best, best_w = None, -1
@@ -328,13 +380,18 @@ def sanitize_article(html_text, base_url):
     inner = "".join(LH.tostring(c, encoding="unicode") if isinstance(c.tag, str) else "" for c in body) if len(body) else ""
     if body.text and body.text.strip():
         inner = "<p>" + html.escape(body.text.strip()) + "</p>" + inner
-    text = " ".join(body.itertext()).strip()
+    blocks = []
+    for el in body.iter("p", "h2", "h3", "h4", "li", "blockquote"):
+        t = " ".join(" ".join(el.itertext()).split())
+        if t:
+            blocks.append(t)
+    text = "\n\n".join(blocks) if blocks else " ".join(" ".join(body.itertext()).split())
     return inner, text
 
-def article_text(url):
-    """Visit the story and return {'html', 'text', 'images'} or None: readable text with the pictures
-    the extractor kept in place, plus other content photos found on the page (with captions).
-    Honest UA, 12 s, 1.5 MB cap. A short result means a teaser or a blocked page: treated as none."""
+def article_text(rec):
+    """Visit the story and return {'html','text','images','kind'} or None (with a reason in the log).
+    The text must pass looks_like_the_story() before it is ever shown in the paper."""
+    url, title, summary = rec["url"], rec.get("title", ""), rec.get("summary", "")
     if trafilatura is None:
         return None
     try:
@@ -342,22 +399,44 @@ def article_text(url):
         if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
             return None
         html_text = r.raw.read(1_500_000, decode_content=True).decode(r.encoding or "utf-8", "ignore")
+        kind = story_kind(url, title, html_text)
         out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
                                   include_comments=False, include_tables=False, favor_precision=True)
         if not out:
-            return None
+            return {"kind": kind, "text": None, "why": "nothing extracted"}
         body_html, text = sanitize_article(out, url)
-        if len(text) < 400:
-            return None
+        paragraphs = clean_paragraphs(text)
+        ok, why = looks_like_the_story(paragraphs, title, summary)
+        if ok and body_html.count("<img") > 3 + len(" ".join(paragraphs).split()) / 120:
+            ok, why = False, "looks like a listing page (too many pictures for its text)"
+        if not ok:
+            return {"kind": kind, "text": None, "why": why}
+        # rebuild the html without the paragraphs we dropped
+        from lxml import html as LH
+        frag = LH.fragment_fromstring(body_html, create_parent="div")
+        keep = {re.sub(r"\W+", " ", p_.lower()).strip() for p_ in paragraphs}
+        for el in list(frag):
+            if el.tag in ("p", "h2", "h3", "h4", "li", "blockquote"):
+                k = re.sub(r"\W+", " ", " ".join(el.itertext()).lower()).strip()
+                if k and k not in keep:
+                    el.drop_tree()
         images = []
         try:
-            from lxml import html as LH
             images = page_images(LH.fromstring(html_text), url)
         except Exception:
             images = []
+        best = {_img_key(im["src"]): im["src"] for im in images}
+        for im in frag.iter("img"):
+            src = im.get("src", "")
+            k = _img_key(src)
+            if k in best:
+                im.set("src", best[k])            # the full-size version of the same picture
+            elif PLACEHOLDER_RE.search(src):
+                (im.getparent() if im.getparent() is not None and im.getparent().tag == "figure" else im).drop_tree()
+        body_html = "".join(LH.tostring(c, encoding="unicode") for c in frag)
         inline_keys = {_img_key(u) for u in re.findall(r'src="([^"]+)"', body_html)}
-        images = [im for im in images if _img_key(im["src"]) not in inline_keys]
-        return {"html": body_html[:MAX_ARTICLE_CHARS * 2], "text": text[:MAX_ARTICLE_CHARS], "images": images}
+        images = [im for im in images if _img_key(im["src"]) not in inline_keys and not PLACEHOLDER_RE.search(im["src"])]
+        return {"html": body_html[:MAX_ARTICLE_CHARS * 2], "text": "\n\n".join(paragraphs)[:MAX_ARTICLE_CHARS], "images": images, "kind": kind}
     except Exception:
         return None
 
@@ -446,6 +525,7 @@ def main():
                 continue
             rec = {
                 "id": iid, "url": it["url"], "title": it["title"], "summary": it["summary"], "image": it["image"],
+                "kind": story_kind(it["url"], it["title"]),
                 "published": pub or NOW.isoformat(), "seen": NOW.isoformat(), "source": sid,
                 "section": src["section"], "tags": sorted(set(src.get("tags", []) + ([src["place"]] if src.get("place") else []))),
                 "place": src.get("place"),
@@ -491,12 +571,19 @@ def main():
     want = (fresh + stale)[:abudget]
     got = 0
     if want:
+        whys = {}
         with cf.ThreadPoolExecutor(max_workers=12) as ex:
-            for rec, art in zip(want, ex.map(lambda r: article_text(r["url"]), want)):
+            for rec, art in zip(want, ex.map(article_text, want)):
+                art = art or {"text": None, "why": "no page"}
                 with open(os.path.join(ARTICLES_DIR, rec["id"] + ".json"), "w", encoding="utf-8") as f:
-                    json.dump(dict(art or {"text": None}, v=ARTICLE_VERSION, fetched=NOW.isoformat()), f, ensure_ascii=False)
-                got += bool(art)
-        log(f"full text fetched for {len(want)} stories, readable: {got}, with extra pictures: {sum(1 for _ in want)}")
+                    json.dump(dict(art, v=ARTICLE_VERSION, fetched=NOW.isoformat()), f, ensure_ascii=False)
+                if art.get("kind"):
+                    rec["kind"] = art["kind"]
+                if art.get("text"):
+                    got += 1
+                else:
+                    w = art.get("why", "no page"); whys[w] = whys.get(w, 0) + 1
+        log(f"full text fetched for {len(want)} stories, passed the quality check: {got}; rejected: {whys}")
     for name in os.listdir(ARTICLES_DIR):
         if name[:-5] not in store["items"]:
             os.remove(os.path.join(ARTICLES_DIR, name))
@@ -553,7 +640,7 @@ def main():
             f.write(encrypt_with_key(body, ckey) if ckey else body)
         r["reader"] = len(txt.split())
         readable += 1
-    out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also", "reader")}
+    out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also", "reader", "kind")}
                  for r in items]
     bundle = {
         "generated": NOW.isoformat(),

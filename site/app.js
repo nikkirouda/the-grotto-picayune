@@ -17,7 +17,7 @@ let bundle = null;          // {items, weather, prefs, sources, generated}
 let prefs = null;           // effective preferences (bundle prefs + local edits)
 let votes = LS.get('votes', {});        // id -> {v:+1|-1, t:ms, s:source, tags:[...], tok:[...]}
 let read = LS.get('read', {});          // id -> ms
-let opts = Object.assign({ images: true, hideRead: false, showHidden: false, compact: false, sort: 'score' }, LS.get('opts', {}));
+let opts = Object.assign({ images: true, hideRead: false, showHidden: false, compact: false, hideVideo: false, sort: 'score' }, LS.get('opts', {}));
 let route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
 let query = '';
 let shown = 0;
@@ -97,13 +97,15 @@ function score(it) {
   const ageH = Math.max(0, (Date.now() - new Date(it.published).getTime()) / 3.6e6);
   const recency = Math.exp(-ageH / 24) + 0.03;
   const boosts = boostRe ? (it._text.match(boostRe) || []).length : 0;
-  const base = (src.weight || 1) * (1 + 0.2 * Math.min(boosts, 3)) * recency;
+  const video = it.kind === 'video' ? 0.2 : 1;      // written pieces first; video, audio and galleries far down
+  const base = (src.weight || 1) * (1 + 0.2 * Math.min(boosts, 3)) * recency * video;
   const L = learned(it);
   return { value: base * Math.pow(2, L.total / 3), base, boosts, L, ageH };
 }
 function whyText(sc, it) {
   const bits = [];
   const src = sourceById[it.source] || {};
+  if (it.kind === 'video') bits.push('video/audio ×0.2');
   if (src.weight && src.weight !== 1) bits.push(`source ×${src.weight}`);
   if (sc.boosts) bits.push(`${sc.boosts} boosted word${sc.boosts > 1 ? 's' : ''}`);
   if (sc.L.s) bits.push(`${sc.L.s > 0 ? '+' : ''}${sc.L.s.toFixed(1)} source`);
@@ -191,6 +193,7 @@ function visibleItems() {
     const sc = score(it);
     if (!opts.showHidden && sc.L.total <= hideAt && !votes[it.id]) { hidden++; continue; }
     if (opts.hideRead && read[it.id] && !votes[it.id]) continue;
+    if (opts.hideVideo && it.kind === 'video') continue;
     it._sc = sc;
     out.push(it);
   }
@@ -266,6 +269,7 @@ function card(it, lead) {
   if (v) $(v.v > 0 ? '.up' : '.down', n).classList.add('on');
   $('.why', n).textContent = whyText(it._sc, it);
   $$('a', n).forEach(a => a.addEventListener('click', () => markRead(it, n)));
+  if (it.kind === 'video') { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· video/audio'; $('.meta', n).appendChild(b); }
   if (it.reader) {
     $('.rd', n).textContent = '· in the paper';
     for (const a of [$('.title', n), $('.thumb', n)]) a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); openReader(it, n); });
@@ -327,7 +331,15 @@ async function openReader(it, n) {
     if (extra.length) {
       $('#readerText').insertAdjacentHTML('beforeend', `<div class="gallery"><h3>More pictures from the story</h3>${extra.map(im => `<figure><img src="${esc(im.src)}" alt="${esc(im.alt)}" loading="lazy" referrerpolicy="no-referrer"><figcaption>${esc(im.caption || im.alt)}</figcaption></figure>`).join('')}</div>`);
     }
-    $$('#readerText img').forEach(im => { im.loading = 'lazy'; im.referrerPolicy = 'no-referrer'; im.onerror = () => { const f = im.closest('figure'); (f || im).remove(); }; });
+    const dropImg = im => { const f = im.closest('figure'); (f || im).remove(); const g = $('.gallery'); if (g && !g.querySelector('img')) g.remove(); };
+    $$('#readerText img').forEach(im => {
+      im.loading = 'lazy'; im.referrerPolicy = 'no-referrer';
+      im.onerror = () => dropImg(im);
+      im.onload = () => { if (im.naturalWidth < 320 || im.naturalHeight < 160) dropImg(im); };   // placeholders and thumbnails never show full width
+      if (im.complete && im.naturalWidth && (im.naturalWidth < 320 || im.naturalHeight < 160)) dropImg(im);
+    });
+    const goodPars = $$('#readerText p').filter(p => p.textContent.trim().split(/\s+/).length >= 15).length;
+    if (goodPars < 2) throw new Error('the pulled text does not read like a story');
     const first = $('#readerText').firstElementChild;
     if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
@@ -514,7 +526,7 @@ function addTerm(key, inputEl) {
   savePrefsLocal(patch); inputEl.value = ''; fillTopics(); buildList();
 }
 function fillSettings() {
-  $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact;
+  $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact; $('#optHideVideo').checked = opts.hideVideo;
   $('#blockedTerms').value = (prefs.blocked_terms || []).join('\n'); $('#blockedCount').textContent = `(${(prefs.blocked_terms || []).length})`;
   $('#boostTerms').value = (prefs.boosted_terms || []).join('\n'); $('#boostCount').textContent = `(${(prefs.boosted_terms || []).length})`;
   $('#hideThreshold').value = prefs.hide_threshold ?? -2;
@@ -555,7 +567,7 @@ function wireSettings() {
   $('#addBoost').onsubmit = e => { e.preventDefault(); addTerm('boosted_terms', $('#addBoost input')); };
   $('#addBlock').onsubmit = e => { e.preventDefault(); addTerm('blocked_terms', $('#addBlock input')); };
   const opt = (id, key, after) => $(id).onchange = e => { opts[key] = e.target.checked; LS.set('opts', opts); document.body.classList.toggle('compact', opts.compact); buildList(); };
-  opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact');
+  opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact'); opt('#optHideVideo', 'hideVideo');
   const lines = v => v.split('\n').map(x => x.trim()).filter(Boolean);
   $('#blockedTerms').onchange = e => { savePrefsLocal({ blocked_terms: lines(e.target.value) }); fillSettings(); buildList(); };
   $('#boostTerms').onchange = e => { savePrefsLocal({ boosted_terms: lines(e.target.value) }); fillSettings(); buildList(); };
