@@ -34,7 +34,7 @@ jobs:
       - name: Restore the archive from the last run
         uses: actions/cache/restore@v4
         with:
-          path: data/store.json
+          path: data
           key: store-${{ github.run_id }}
           restore-keys: store-
       - name: Fetch sources and build the bundle
@@ -45,7 +45,7 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: data/store.json
+          path: data
           key: store-${{ github.run_id }}
       - name: Weekly heartbeat (GitHub pauses schedules in repos with no commits for 60 days)
         run: |

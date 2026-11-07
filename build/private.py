@@ -19,6 +19,15 @@ ITERATIONS = 200_000
 def _key(passphrase: str, salt: bytes) -> bytes:
     return PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITERATIONS).derive(passphrase.encode("utf-8"))
 
+def derive_key(passphrase: str, salt: bytes) -> bytes:
+    """Same derivation the page uses (PBKDF2-SHA256, 200 000 rounds). One key per salt."""
+    return _key(passphrase, salt)
+
+def encrypt_with_key(data: bytes, key: bytes) -> bytes:
+    """nonce | ciphertext — for the many small article files, which share one key per build."""
+    nonce = os.urandom(12)
+    return nonce + AESGCM(key).encrypt(nonce, data, None)
+
 def encrypt_bytes(data: bytes, passphrase: str) -> bytes:
     salt, nonce = os.urandom(16), os.urandom(12)
     return salt + nonce + AESGCM(_key(passphrase, salt)).encrypt(nonce, data, None)

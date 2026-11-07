@@ -18,7 +18,7 @@ let prefs = null;           // effective preferences (bundle prefs + local edits
 let votes = LS.get('votes', {});        // id -> {v:+1|-1, t:ms, s:source, tags:[...], tok:[...]}
 let read = LS.get('read', {});          // id -> ms
 let opts = Object.assign({ images: true, hideRead: false, showHidden: false, compact: false, sort: 'score' }, LS.get('opts', {}));
-let route = location.hash.replace(/^#\/?/, '') || 'foryou';
+let route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
 let query = '';
 let shown = 0;
 const PAGE = 36;
@@ -26,6 +26,9 @@ let blockedRe = null, boostRe = null, lensRes = {};
 let sourceById = {};
 let model = { src: {}, tag: {}, tok: {} };
 let currentList = [];
+let manifest = {};
+let articleKey = null;      // derived once per page load from the manifest's salt
+let readerItem = null;
 
 // ------------------------------------------------------------- utilities
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -112,6 +115,7 @@ function whyText(sc, it) {
 async function loadBundle() {
   setStatus('Loading…');
   const mf = await fetch('data/manifest.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  manifest = mf || {};
   if (mf && mf.encrypted) {
     const buf = await fetch('data/bundle.enc', { cache: 'no-store' }).then(r => r.arrayBuffer());
     let pass = LS.get('pass', null);
@@ -253,6 +257,10 @@ function card(it, lead) {
   if (v) $(v.v > 0 ? '.up' : '.down', n).classList.add('on');
   $('.why', n).textContent = whyText(it._sc, it);
   $$('a', n).forEach(a => a.addEventListener('click', () => markRead(it, n)));
+  if (it.reader) {
+    $('.rd', n).textContent = '· in the paper';
+    for (const a of [$('.title', n), $('.thumb', n)]) a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); openReader(it, n); });
+  }
   $('.up', n).onclick = () => vote(it, +1, n);
   $('.down', n).onclick = () => vote(it, -1, n);
   $('.mute', n).onclick = () => { if (confirm(`Mute ${it._src}? You can unmute it in Settings → Sources.`)) { savePrefsLocal({ muted_sources: Array.from(new Set([...(prefs.muted_sources || []), it.source])) }); fillSettings(); buildList(); } };
@@ -263,6 +271,48 @@ function card(it, lead) {
   return n;
 }
 function markRead(it, n) { read[it.id] = Date.now(); pruneRead(); LS.set('read', read); n.classList.add('read'); }
+async function openReader(it, n) {
+  readerItem = it;
+  const r = $('#reader');
+  $('#readerSrc').textContent = it._src;
+  $('#readerOpen').href = it.url;
+  $('#readerTitle').textContent = it.title;
+  $('#readerMeta').textContent = `${new Date(it.published).toLocaleString()} · about ${Math.max(1, Math.round(it.reader / 230))} min read`;
+  const img = $('#readerImg');
+  if (it.image && opts.images) { img.src = it.image; img.classList.remove('hidden'); img.onerror = () => img.classList.add('hidden'); } else img.classList.add('hidden');
+  $('#readerText').innerHTML = '<p class="muted">Loading…</p>';
+  $('#readerFoot').textContent = '';
+  $('#readerUp').classList.toggle('on', !!votes[it.id] && votes[it.id].v > 0);
+  $('#readerDown').classList.toggle('on', !!votes[it.id] && votes[it.id].v < 0);
+  $('#readerUp').onclick = () => { vote(it, +1, n || document.createElement('div')); $('#readerUp').classList.toggle('on', !!votes[it.id] && votes[it.id].v > 0); $('#readerDown').classList.toggle('on', !!votes[it.id] && votes[it.id].v < 0); };
+  $('#readerDown').onclick = () => { vote(it, -1, n || document.createElement('div')); $('#readerUp').classList.toggle('on', !!votes[it.id] && votes[it.id].v > 0); $('#readerDown').classList.toggle('on', !!votes[it.id] && votes[it.id].v < 0); };
+  r.classList.remove('hidden'); r.scrollTop = 0; document.body.style.overflow = 'hidden';
+  if (!location.hash.endsWith('/read')) history.pushState({ reader: it.id }, '', location.hash + '/read');
+  if (n) markRead(it, n);
+  try {
+    let text;
+    if (manifest.encrypted) {
+      if (!articleKey) {
+        const pass = LS.get('pass', null);
+        articleKey = await deriveKey(pass, b64ToBytes(manifest.salt), 'decrypt');
+      }
+      const buf = new Uint8Array(await fetch(`data/a/${it.id}.bin`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.arrayBuffer(); }));
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, articleKey, buf.slice(12));
+      text = JSON.parse(new TextDecoder().decode(plain)).text;
+    } else {
+      text = (await fetch(`data/a/${it.id}.json`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.json(); })).text;
+    }
+    if (readerItem !== it) return;
+    $('#readerText').innerHTML = text.split(/\n{1,}/).map(par => par.trim()).filter(Boolean).map(par => par.length < 80 && !/[.!?]$/.test(par) ? `<h3>${esc(par)}</h3>` : `<p>${esc(par)}</p>`).join('');
+    $('#readerFoot').textContent = `Text fetched from ${it._src} for your reading only. Photos, captions and anything shown as a graphic stay at the source.`;
+  } catch (e) {
+    $('#readerText').innerHTML = `<p class="muted">The text is not in the paper. <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a></p>`;
+  }
+}
+function closeReader(fromHistory) {
+  $('#reader').classList.add('hidden'); document.body.style.overflow = ''; readerItem = null;
+  if (!fromHistory && location.hash.endsWith('/read')) history.back();
+}
 function pruneRead() { const cut = Date.now() - 21 * 864e5; for (const k in read) if (read[k] < cut) delete read[k]; }
 function vote(it, v, n) {
   if (votes[it.id] && votes[it.id].v === v) { delete votes[it.id]; const d = LS.get('deletedVotes', {}); d[it.id] = Date.now(); LS.set('deletedVotes', d); }
@@ -305,7 +355,8 @@ function renderTabs() {
   const a = $('#tabs a.active'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
 function go() {
-  route = location.hash.replace(/^#\/?/, '') || 'foryou';
+  if (location.hash.endsWith('/read')) { if (!readerItem) history.replaceState(null, '', location.hash.replace(/\/read$/, '')); else return; }
+  route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
   query = ''; $('#q').value = '';
   renderTabs(); buildList(); window.scrollTo(0, 0);
 }
@@ -403,6 +454,9 @@ function wireSettings() {
   };
   $$('.sort button').forEach(b => b.onclick = () => { opts.sort = b.dataset.sort; LS.set('opts', opts); buildList(); });
   $('#moreBtn').onclick = renderMore;
+  $('#readerBack').onclick = () => closeReader(false);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && readerItem) closeReader(false); });
+  window.addEventListener('popstate', () => { if (readerItem && !location.hash.endsWith('/read')) closeReader(true); });
   let qt; $('#q').addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { query = e.target.value.trim(); if (query) $$('#tabs a').forEach(a => a.classList.remove('active')); else renderTabs(); buildList(); }, 180); });
   $('#searchForm').addEventListener('submit', e => e.preventDefault());
 }

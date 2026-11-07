@@ -35,6 +35,12 @@ site/ (index.html, app.js) ──► GitHub Pages
 - **The build** fetches all feeds in parallel, de-duplicates, trims tracking parameters, finds a photo
   (feed media first, then the article's `og:image` for up to 80 stories a run), pulls Open-Meteo
   weather for each place, and writes the bundle.
+- **The reader.** For up to 250 new stories a run the build also visits the story and keeps its readable
+  text (trafilatura), one small encrypted file per story under `site/data/a/`. Tapping a headline then
+  opens the story inside the page: text and photo, no ads, no cookie banners, with a *read at source*
+  link. Stories whose page gave no usable text (paywalls, teasers, sites that refuse readers) open at
+  the source as before. The texts are for your own reading; the files are encrypted like everything
+  else and never republished. A source can opt out with `fulltext: false` in `feeds.yml`.
 - **Ranking** happens in the browser, one method, in `site/app.js`:
   `score = source weight × (1 + 0.2 × boosted-word hits) × e^(−age/24h) × 2^(learned/3)`
   where `learned` is what your 👍/👎 taught it about the story's source, topics and headline words
@@ -62,6 +68,7 @@ site/ (index.html, app.js) ──► GitHub Pages
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.
 - ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
   matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
+- A headline marked *in the paper* opens inside the page; ⌘/Ctrl-click still opens the source.
 - 👍 / 👎 on any card teaches the ranking; *mute* silences a source; *block…* removes a word everywhere.
 - Settings shows what has been learned, the source health from the last build, and backup/restore.
 - To add a public source: a line in `feeds.yml`, commit. To add a place or a private source, or to

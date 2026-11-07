@@ -1,5 +1,6 @@
 # Public source list — every source is free to read, no login, no subscription.
-# Fields: id, name, url (RSS/Atom), home, section, tags (list), weight (0.5–1.5, default 1), place (optional)
+# Fields: id, name, url (RSS/Atom), home, section, tags (list), weight (0.5–1.5, default 1), place (optional),
+#         fulltext (default true; false = never fetch this source's story text for the in-app reader)
 # Sources for private places live in private.enc (see README) and are merged in at build time.
 # Checked live 2026-11-07.
 sources:

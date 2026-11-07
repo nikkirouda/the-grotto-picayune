@@ -126,11 +126,30 @@
 </aside>
 <div id="scrim" class="scrim"></div>
 
+<div id="reader" class="reader hidden" role="dialog" aria-modal="true" aria-label="Story">
+  <div class="reader-bar">
+    <button class="icon-btn" id="readerBack" aria-label="Back">←</button>
+    <span class="reader-src" id="readerSrc"></span>
+    <a id="readerOpen" class="small-btn" target="_blank" rel="noopener noreferrer">read at source ↗</a>
+  </div>
+  <article class="reader-body">
+    <h1 id="readerTitle"></h1>
+    <p class="reader-meta muted" id="readerMeta"></p>
+    <img id="readerImg" alt="" referrerpolicy="no-referrer" class="hidden">
+    <div id="readerText"></div>
+    <p class="reader-foot muted small" id="readerFoot"></p>
+    <div class="actions reader-actions">
+      <button class="vote up" id="readerUp" title="More like this">👍</button>
+      <button class="vote down" id="readerDown" title="Less like this">👎</button>
+    </div>
+  </article>
+</div>
+
 <template id="cardTpl">
   <article class="card">
     <a class="thumb" target="_blank" rel="noopener noreferrer"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt=""></a>
     <div class="body">
-      <div class="meta"><a class="source" target="_blank" rel="noopener noreferrer"></a><span class="dot">·</span><time></time><span class="also"></span></div>
+      <div class="meta"><a class="source" target="_blank" rel="noopener noreferrer"></a><span class="dot">·</span><time></time><span class="also"></span><span class="rd" title="Opens in the paper, no ads"></span></div>
       <h3><a class="title" target="_blank" rel="noopener noreferrer"></a></h3>
       <p class="summary"></p>
       <div class="actions">

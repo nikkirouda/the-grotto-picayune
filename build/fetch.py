@@ -10,6 +10,7 @@ Environment:
                     config/preferences.json (or the example file) and publishes in the clear.
   STORE_PATH        where the 14-day archive lives (default data/store.json; kept in the Actions cache)
   OG_BUDGET         how many article pages to visit for a missing photo per run (default 80)
+  ARTICLE_BUDGET    how many new stories get their full text fetched per run (default 250)
 """
 import concurrent.futures as cf
 import datetime as dt
@@ -27,10 +28,18 @@ import requests
 import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from private import encrypt_bytes, load_private  # noqa: E402
+from private import encrypt_bytes, load_private, derive_key, encrypt_with_key  # noqa: E402
+import base64  # noqa: E402
+import shutil  # noqa: E402
+try:
+    import trafilatura  # noqa: E402
+except ImportError:  # the build installs it; a bare local run still works without the reader
+    trafilatura = None
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STORE_PATH = os.environ.get("STORE_PATH") or os.path.join(ROOT, "data", "store.json")
+ARTICLES_DIR = os.path.join(os.path.dirname(STORE_PATH), "articles")   # full texts, one JSON per story, cache only
+MAX_ARTICLE_CHARS = 40_000
 UA = "household-news/0.1 (personal RSS reader; +https://github.com/nikkirouda)"
 KEEP_DAYS = 14          # how long a story stays in the store (searchable history)
 PUBLISH_DAYS = 7        # how much of it the site receives
@@ -191,6 +200,23 @@ def og_image(url):
     except Exception:
         return ""
 
+def article_text(url):
+    """Visit the story and return its readable text (paragraphs separated by blank lines), or None.
+    Honest UA, 12 s, 1.5 MB cap. A short result means a teaser or a blocked page: treated as none."""
+    if trafilatura is None:
+        return None
+    try:
+        r = requests.get(url, headers={"User-Agent": UA, "Accept": "text/html"}, timeout=12, stream=True)
+        if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
+            return None
+        html_text = r.raw.read(1_500_000, decode_content=True).decode(r.encoding or "utf-8", "ignore")
+        txt = trafilatura.extract(html_text, url=url, include_comments=False, include_tables=False, favor_precision=True)
+        if not txt or len(txt) < 400:
+            return None
+        return txt[:MAX_ARTICLE_CHARS]
+    except Exception:
+        return None
+
 def weather_for(place, attempt=0):
     """Open-Meteo, no key. Returns a small dict or None. One retry on a slow or rate-limited answer."""
     try:
@@ -302,6 +328,26 @@ def main():
                     rec["image"] = img
         log(f"photos looked up: {len(want)}, found: {sum(1 for r in want if r.get('image'))}")
 
+    # 4b. full text for new stories (newest first, bounded); kept in the cache next to the store
+    os.makedirs(ARTICLES_DIR, exist_ok=True)
+    abudget = int(os.environ.get("ARTICLE_BUDGET", "250"))
+    want = [v for v in store["items"].values() if not os.path.exists(os.path.join(ARTICLES_DIR, v["id"] + ".json"))
+            and by_id.get(v["source"], {}).get("fulltext", True)
+            and dt.datetime.fromisoformat(v["published"]) >= NOW - dt.timedelta(days=PUBLISH_DAYS)]
+    want.sort(key=lambda r: r["published"], reverse=True)
+    want = want[:abudget]
+    got = 0
+    if want:
+        with cf.ThreadPoolExecutor(max_workers=12) as ex:
+            for rec, txt in zip(want, ex.map(lambda r: article_text(r["url"]), want)):
+                with open(os.path.join(ARTICLES_DIR, rec["id"] + ".json"), "w", encoding="utf-8") as f:
+                    json.dump({"text": txt, "fetched": NOW.isoformat()}, f, ensure_ascii=False)
+                got += bool(txt)
+        log(f"full text fetched for {len(want)} stories, readable: {got}")
+    for name in os.listdir(ARTICLES_DIR):
+        if name[:-5] not in store["items"]:
+            os.remove(os.path.join(ARTICLES_DIR, name))
+
     # 5. weather
     weather = {}
     for place in prefs.get("places", []):
@@ -325,7 +371,23 @@ def main():
             seen_titles[key] = v
     items = [v for v in items if not v.pop("_dup", False)]
     items.sort(key=lambda r: r["published"], reverse=True)
-    out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also")}
+    adir = os.path.join(ROOT, "site", "data", "a")
+    shutil.rmtree(adir, ignore_errors=True)
+    os.makedirs(adir, exist_ok=True)
+    salt = os.urandom(16)
+    ckey = derive_key(passphrase, salt) if passphrase else None
+    readable = 0
+    for r in items:
+        ap = os.path.join(ARTICLES_DIR, r["id"] + ".json")
+        txt = load_json(ap, {}).get("text") if os.path.exists(ap) else None
+        if not txt:
+            continue
+        body = json.dumps({"id": r["id"], "text": txt}, ensure_ascii=False).encode("utf-8")
+        with open(os.path.join(adir, r["id"] + (".bin" if ckey else ".json")), "wb") as f:
+            f.write(encrypt_with_key(body, ckey) if ckey else body)
+        r["reader"] = len(txt.split())
+        readable += 1
+    out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also", "reader")}
                  for r in items]
     bundle = {
         "generated": NOW.isoformat(),
@@ -351,11 +413,12 @@ def main():
         if os.path.exists(enc_path):
             os.remove(enc_path)
     with open(os.path.join(ROOT, "site", "data", "manifest.json"), "w", encoding="utf-8") as f:
-        json.dump({"generated": NOW.isoformat(), "encrypted": bool(passphrase), "stories": len(out_items)}, f)
+        json.dump({"generated": NOW.isoformat(), "encrypted": bool(passphrase), "stories": len(out_items), "readable": readable,
+                   "salt": base64.b64encode(salt).decode() if ckey else None}, f)
     os.makedirs(os.path.dirname(STORE_PATH), exist_ok=True)
     with open(STORE_PATH, "w", encoding="utf-8") as f:
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
-    log(f"published {len(out_items)} stories ({len(raw)//1024} KB{', encrypted' if passphrase else ''}); weather for {len(weather)} places")
+    log(f"published {len(out_items)} stories ({len(raw)//1024} KB{', encrypted' if passphrase else ''}), {readable} with full text; weather for {len(weather)} places")
 
 if __name__ == "__main__":
     main()
