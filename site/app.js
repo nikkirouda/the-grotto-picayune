@@ -301,12 +301,20 @@ async function openReader(it, n) {
   try {
     let text, art;
     if (manifest.encrypted) {
-      if (!articleKey) {
-        const pass = LS.get('pass', null);
-        articleKey = await deriveKey(pass, b64ToBytes(manifest.salt), 'decrypt');
+      const pass = LS.get('pass', null);
+      if (!articleKey) articleKey = await deriveKey(pass, b64ToBytes(manifest.salt), 'decrypt');
+      const fetchBin = () => fetch(`data/a/${it.id}.bin`, { cache: 'no-store' }).then(x => { if (!x.ok) throw new Error('missing'); return x.arrayBuffer(); });
+      let buf = new Uint8Array(await fetchBin());
+      let plain;
+      try {
+        plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, articleKey, buf.slice(12));
+      } catch {
+        // the site was rebuilt since this page loaded: take the current key and try once more
+        const mf = await fetch('data/manifest.json', { cache: 'no-store' }).then(r => r.json());
+        manifest = mf; articleKey = await deriveKey(pass, b64ToBytes(mf.salt), 'decrypt');
+        buf = new Uint8Array(await fetchBin());
+        plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, articleKey, buf.slice(12));
       }
-      const buf = new Uint8Array(await fetch(`data/a/${it.id}.bin`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.arrayBuffer(); }));
-      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, articleKey, buf.slice(12));
       art = JSON.parse(new TextDecoder().decode(plain));
     } else {
       art = await fetch(`data/a/${it.id}.json`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.json(); });
@@ -324,7 +332,7 @@ async function openReader(it, n) {
     if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
   } catch (e) {
-    $('#readerText').innerHTML = `<p class="muted">The text is not in the paper. <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a></p>`;
+    $('#readerText').innerHTML = `<p class="muted">The text could not be loaded just now (${esc(e.message)}). Reloading the paper usually fixes it; otherwise <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">read it at ${esc(it._src)} ↗</a>.</p>`;
   }
 }
 function imgKey(u) { try { const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }

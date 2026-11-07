@@ -527,7 +527,17 @@ def main():
     adir = os.path.join(ROOT, "site", "data", "a")
     shutil.rmtree(adir, ignore_errors=True)
     os.makedirs(adir, exist_ok=True)
-    salt = os.urandom(16)
+    # one stable salt per site (kept with the archive), so a page opened before a rebuild still unlocks articles
+    salt_path = os.path.join(os.path.dirname(STORE_PATH), "salt.bin")
+    try:
+        with open(salt_path, "rb") as f:
+            salt = f.read()
+        assert len(salt) == 16
+    except Exception:
+        salt = os.urandom(16)
+        os.makedirs(os.path.dirname(salt_path), exist_ok=True)
+        with open(salt_path, "wb") as f:
+            f.write(salt)
     ckey = derive_key(passphrase, salt) if passphrase else None
     readable = 0
     for r in items:
