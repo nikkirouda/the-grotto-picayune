@@ -243,7 +243,7 @@ def clean_paragraphs(text):
 def looks_like_the_story(paragraphs, title, summary):
     """The extracted text must read like an article and must be the article the feed described."""
     words = [w for w in re.findall(r"[A-Za-z][A-Za-z'’-]{2,}", " ".join(paragraphs))]
-    if len(words) < 150:
+    if len(words) < 120:
         return False, "too short"
     long_pars = [p for p in paragraphs if len(p.split()) >= 15]
     if len(long_pars) < 2:
@@ -628,6 +628,8 @@ def main():
     ckey = derive_key(passphrase, salt) if passphrase else None
     readable = 0
     for r in items:
+        if not r.get("kind"):
+            r["kind"] = story_kind(r["url"], r["title"])
         ap = os.path.join(ARTICLES_DIR, r["id"] + ".json")
         art = load_json(ap, {}) if os.path.exists(ap) else {}
         txt = art.get("text")
