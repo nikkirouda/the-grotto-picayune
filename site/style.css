@@ -117,7 +117,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 .scrim.show { opacity: 1; pointer-events: auto; }
 
 @media (max-width: 640px) {
-  .masthead { gap: 8px; padding: 8px 12px; }
+  .masthead { gap: 8px; padding: 8px 12px 6px; flex-wrap: wrap; }
+  .brand { flex: 1; }
+  .search { order: 3; flex: 0 0 100%; }
+  .search input { font-size: 1.05rem; padding: 10px 14px; }
   .brand { font-size: 1.1rem; }
   .tabs { padding: 0 12px 8px; }
   main { padding: 10px 12px 40px; }
