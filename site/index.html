@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#1f3a5f">
+<title>The Grotto Picayune</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="masthead">
+    <a class="brand" href="#/foryou"><span class="brand-mark" aria-hidden="true"></span>The Grotto Picayune</a>
+    <form class="search" id="searchForm" role="search" onsubmit="return false">
+      <input id="q" type="search" placeholder="Search the week's stories" autocomplete="off" aria-label="Search">
+    </form>
+    <div class="tools">
+      <button class="icon-btn" id="themeBtn" title="Light / dark" aria-label="Toggle theme">◐</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+</header>
+
+<main id="main">
+  <div id="gate" class="gate hidden">
+    <h2>Unlock</h2>
+    <p>This page is encrypted. Enter the passphrase once on this device.</p>
+    <form id="gateForm"><input id="passphrase" type="password" autocomplete="current-password" placeholder="Passphrase"><button type="submit">Unlock</button></form>
+    <p id="gateMsg" class="muted"></p>
+  </div>
+  <div id="status" class="status muted">Loading…</div>
+  <section id="weather" class="weather hidden"></section>
+  <div id="sectionHead" class="section-head hidden">
+    <h1 id="sectionTitle"></h1>
+    <div class="sort">
+      <button data-sort="score" class="active">For you</button><button data-sort="time">Newest</button>
+    </div>
+  </div>
+  <div id="cards" class="cards"></div>
+  <div class="more-wrap"><button id="moreBtn" class="more hidden">Show more</button></div>
+  <footer class="foot muted" id="foot"></footer>
+</main>
+
+<aside id="settings" class="drawer" aria-hidden="true">
+  <div class="drawer-head"><h2>Settings</h2><button class="icon-btn" id="closeSettings" aria-label="Close">✕</button></div>
+  <div class="drawer-body">
+
+    <details open>
+      <summary>Display</summary>
+      <label><input type="checkbox" id="optImages" checked> Show photos</label>
+      <label><input type="checkbox" id="optHideRead"> Hide stories I've opened</label>
+      <label><input type="checkbox" id="optShowHidden"> Show stories the dislikes would hide</label>
+      <label><input type="checkbox" id="optCompact"> Compact cards</label>
+    </details>
+
+    <details>
+      <summary>Blocked words <span class="count" id="blockedCount"></span></summary>
+      <p class="muted small">One per line. Whole-word, case-insensitive match in title or summary. A hit removes the story.</p>
+      <textarea id="blockedTerms" rows="10" spellcheck="false"></textarea>
+    </details>
+
+    <details>
+      <summary>Boosted words <span class="count" id="boostCount"></span></summary>
+      <p class="muted small">Stories mentioning these float up.</p>
+      <textarea id="boostTerms" rows="6" spellcheck="false"></textarea>
+    </details>
+
+    <details>
+      <summary>Sources <span class="count" id="sourceCount"></span></summary>
+      <p class="muted small">Untick to mute. Status is from the last build.</p>
+      <div id="sourceList" class="source-list"></div>
+    </details>
+
+    <details>
+      <summary>What I've learned</summary>
+      <p class="muted small">Every 👍 or 👎 adjusts the weight of that story's source, its topics, and the words in its title. Stories scoring at or below the hide threshold are hidden.</p>
+      <label>Hide threshold <input type="number" id="hideThreshold" step="0.5" style="width:5em"></label>
+      <div id="learned" class="learned"></div>
+      <button id="resetVotes" class="danger">Forget all votes</button>
+    </details>
+
+    <details>
+      <summary>Sync between devices</summary>
+      <p class="muted small">Votes and preferences live in this browser. To share them between laptop and phone (and to let the hourly build use your blocked words), paste a GitHub fine-grained token for this site's repository with <b>Contents: read &amp; write</b> and <b>Actions: read &amp; write</b>. It never leaves this device except to talk to GitHub.</p>
+      <label>Repository <input id="repo" placeholder="owner/name"></label>
+      <label>Token <input id="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+      <div class="row"><button id="syncBtn">Sync now</button><button id="rebuildBtn">Refresh the news now</button></div>
+      <p id="syncMsg" class="muted small"></p>
+    </details>
+
+    <details>
+      <summary>Backup</summary>
+      <div class="row"><button id="exportBtn">Export votes &amp; preferences</button><label class="btn-like">Import<input type="file" id="importFile" accept="application/json" hidden></label></div>
+      <button id="forgetPass" class="hidden">Forget passphrase on this device</button>
+    </details>
+
+    <p class="muted small" id="buildInfo"></p>
+  </div>
+</aside>
+<div id="scrim" class="scrim"></div>
+
+<template id="cardTpl">
+  <article class="card">
+    <a class="thumb" target="_blank" rel="noopener noreferrer"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt=""></a>
+    <div class="body">
+      <div class="meta"><a class="source" target="_blank" rel="noopener noreferrer"></a><span class="dot">·</span><time></time><span class="also"></span></div>
+      <h3><a class="title" target="_blank" rel="noopener noreferrer"></a></h3>
+      <p class="summary"></p>
+      <div class="actions">
+        <button class="vote up" title="More like this" aria-label="Like">👍</button>
+        <button class="vote down" title="Less like this" aria-label="Dislike">👎</button>
+        <button class="small-btn mute" title="Mute this source">mute</button>
+        <button class="small-btn block" title="Block a word from this headline">block…</button>
+        <span class="why muted"></span>
+      </div>
+    </div>
+  </article>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>

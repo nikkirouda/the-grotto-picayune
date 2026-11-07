@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""Fetch every source in feeds.yml, normalise, de-duplicate, find a photo for each story,
+pull the weather for each place, and write the bundle the site reads.
+
+Run from the repo root:  python3 build/fetch.py
+Environment:
+  NEWS_PASSPHRASE   unlocks private.enc (your extra sources, preferences and votes) and encrypts the
+                    published bundle (site/data/bundle.enc). The site asks for it once per device.
+                    Without it, and without a private.enc, the build runs on feeds.yml plus
+                    config/preferences.json (or the example file) and publishes in the clear.
+  STORE_PATH        where the 14-day archive lives (default data/store.json; kept in the Actions cache)
+  OG_BUDGET         how many article pages to visit for a missing photo per run (default 80)
+"""
+import concurrent.futures as cf
+import datetime as dt
+import hashlib
+import html
+import json
+import os
+import re
+import sys
+import time
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+
+import feedparser
+import requests
+import yaml
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from private import encrypt_bytes, load_private  # noqa: E402
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STORE_PATH = os.environ.get("STORE_PATH") or os.path.join(ROOT, "data", "store.json")
+UA = "household-news/0.1 (personal RSS reader; +https://github.com/nikkirouda)"
+KEEP_DAYS = 14          # how long a story stays in the store (searchable history)
+PUBLISH_DAYS = 7        # how much of it the site receives
+MAX_SUMMARY = 320
+NOW = dt.datetime.now(dt.timezone.utc)
+
+def log(*a):
+    print(*a, file=sys.stderr, flush=True)
+
+def load_json(path, default):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return default
+
+# ---------------------------------------------------------------- helpers
+TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
+            "fbclid", "gclid", "mc_cid", "mc_eid", "ref", "source", "cmpid", "ns_mchannel", "ns_campaign", "ns_source"}
+
+def canonical(url):
+    try:
+        p = urlparse(url.strip())
+        q = [(k, v) for k, v in parse_qsl(p.query, keep_blank_values=True) if k.lower() not in TRACKING]
+        host = p.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        path = p.path.rstrip("/") or "/"
+        return urlunparse(("https", host, path, "", urlencode(q), ""))
+    except Exception:
+        return url
+
+TAG_RE = re.compile(r"<[^>]+>")
+WS_RE = re.compile(r"\s+")
+IMG_RE = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", re.I)
+
+def clean_text(s):
+    if not s:
+        return ""
+    s = TAG_RE.sub(" ", s)
+    s = html.unescape(s)
+    s = WS_RE.sub(" ", s).strip()
+    return s
+
+def trim(s, n=MAX_SUMMARY):
+    if len(s) <= n:
+        return s
+    cut = s[:n].rsplit(" ", 1)[0]
+    return cut.rstrip(" ,;:-") + "…"
+
+def norm_title(t):
+    t = re.sub(r"[^a-z0-9 ]", " ", t.lower())
+    return WS_RE.sub(" ", t).strip()
+
+def entry_time(e):
+    for key in ("published_parsed", "updated_parsed", "created_parsed"):
+        tp = e.get(key)
+        if tp:
+            try:
+                return dt.datetime(*tp[:6], tzinfo=dt.timezone.utc)
+            except Exception:
+                pass
+    return None
+
+def entry_image(e):
+    # media:content / media:thumbnail
+    for key in ("media_content", "media_thumbnail"):
+        for m in e.get(key, []) or []:
+            u = m.get("url")
+            if u and (m.get("medium") in (None, "image") or str(m.get("type", "")).startswith("image")):
+                if not re.search(r"\.(mp4|mp3|m4a|webm)(\?|$)", u, re.I):
+                    return u
+    for l in (e.get("enclosures") or []) + (e.get("links") or []):
+        if str(l.get("type", "")).startswith("image") and l.get("href"):
+            return l["href"]
+    blobs = [c.get("value", "") for c in e.get("content", []) or []] + [e.get("summary", "")]
+    for b in blobs:
+        m = IMG_RE.search(b or "")
+        if m:
+            u = m.group(1)
+            if "feedburner" in u or "pixel" in u or u.endswith(".gif") or "1x1" in u:
+                continue
+            return u
+    return None
+
+def abs_url(base, u):
+    if not u:
+        return u
+    if u.startswith("//"):
+        return "https:" + u
+    if u.startswith("/"):
+        p = urlparse(base)
+        return f"{p.scheme}://{p.netloc}{u}"
+    return u
+
+# ---------------------------------------------------------------- fetching
+def fetch_source(src, http_cache):
+    sid = src["id"]
+    headers = {"User-Agent": UA, "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8"}
+    cache = http_cache.get(sid, {})
+    if cache.get("etag"):
+        headers["If-None-Match"] = cache["etag"]
+    if cache.get("last_modified"):
+        headers["If-Modified-Since"] = cache["last_modified"]
+    t0 = time.time()
+    try:
+        r = requests.get(src["url"], headers=headers, timeout=25)
+    except Exception as ex:
+        return sid, None, f"error {type(ex).__name__}", time.time() - t0, cache
+    if r.status_code == 304:
+        return sid, [], "unchanged", time.time() - t0, cache
+    if r.status_code != 200:
+        return sid, None, f"http {r.status_code}", time.time() - t0, cache
+    feed = feedparser.parse(r.content)
+    new_cache = {"etag": r.headers.get("ETag"), "last_modified": r.headers.get("Last-Modified"), "checked": NOW.isoformat()}
+    items = []
+    for e in feed.entries:
+        link = e.get("link") or ""
+        title = clean_text(e.get("title", ""))
+        if not link or not title:
+            continue
+        when = entry_time(e)
+        summary = ""
+        for c in e.get("content", []) or []:
+            summary = clean_text(c.get("value", ""))
+            if summary:
+                break
+        if not summary:
+            summary = clean_text(e.get("summary", ""))
+        if summary.lower().startswith(title.lower()):
+            summary = summary[len(title):].lstrip(" .-–—:")
+        img = abs_url(link, entry_image(e))
+        items.append({
+            "url": canonical(link),
+            "orig_url": link,
+            "title": title,
+            "summary": trim(summary),
+            "image": img,
+            "published": when.isoformat() if when else None,
+            "source": sid,
+        })
+    return sid, items, f"ok {len(items)}", time.time() - t0, new_cache
+
+def og_image(url):
+    """Visit an article page and return its og:image, or '' if none. Honest UA, small read."""
+    try:
+        r = requests.get(url, headers={"User-Agent": UA, "Accept": "text/html"}, timeout=10, stream=True)
+        if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
+            return ""
+        head = r.raw.read(200_000, decode_content=True).decode("utf-8", "ignore")
+        for pat in (r"""<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']""",
+                    r"""<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']""",
+                    r"""<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']"""):
+            m = re.search(pat, head, re.I)
+            if m:
+                return abs_url(url, html.unescape(m.group(1)))
+        return ""
+    except Exception:
+        return ""
+
+def weather_for(place, attempt=0):
+    """Open-Meteo, no key. Returns a small dict or None. One retry on a slow or rate-limited answer."""
+    try:
+        r = requests.get("https://api.open-meteo.com/v1/forecast", params={
+            "latitude": place["lat"], "longitude": place["lon"], "timezone": place.get("tz", "auto"),
+            "current": "temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m",
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset",
+            "temperature_unit": "fahrenheit", "wind_speed_unit": "mph", "forecast_days": 3,
+        }, headers={"User-Agent": UA}, timeout=15)
+        if r.status_code != 200:
+            if attempt == 0:
+                time.sleep(3)
+                return weather_for(place, 1)
+            return None
+        d = r.json()
+        cur, day = d.get("current", {}), d.get("daily", {})
+        return {
+            "temp": cur.get("temperature_2m"), "code": cur.get("weather_code"), "wind": cur.get("wind_speed_10m"),
+            "humidity": cur.get("relative_humidity_2m"),
+            "days": [{"date": day["time"][i], "hi": day["temperature_2m_max"][i], "lo": day["temperature_2m_min"][i],
+                      "pop": (day.get("precipitation_probability_max") or [None]*3)[i], "code": day["weather_code"][i]}
+                     for i in range(len(day.get("time", [])))],
+            "sunrise": (day.get("sunrise") or [None])[0], "sunset": (day.get("sunset") or [None])[0],
+            "fetched": NOW.isoformat(),
+        }
+    except Exception as ex:
+        if attempt == 0:
+            time.sleep(3)
+            return weather_for(place, 1)
+        log("weather", place["id"], type(ex).__name__)
+        return None
+
+# ---------------------------------------------------------------- main
+def main():
+    passphrase = os.environ.get("NEWS_PASSPHRASE", "").strip()
+    feeds = yaml.safe_load(open(os.path.join(ROOT, "feeds.yml"), encoding="utf-8"))["sources"]
+    private = load_private(passphrase)
+    if private:
+        feeds = feeds + list(private.get("sources", []))
+        prefs = private.get("preferences", {})
+        feedback = private.get("feedback", {"votes": {}})
+        log(f"private.enc: {len(private.get('sources', []))} sources, {len(prefs.get('blocked_terms', []))} blocked terms, {len(feedback.get('votes', {}))} votes")
+    else:
+        prefs = load_json(os.path.join(ROOT, "config", "preferences.json"), None) or load_json(os.path.join(ROOT, "config", "preferences.example.json"), {})
+        feedback = {"votes": {}}
+    seen_ids = set()
+    feeds = [s for s in feeds if not (s["id"] in seen_ids or seen_ids.add(s["id"]))]
+    store = load_json(STORE_PATH, {})
+    store.setdefault("items", {}); store.setdefault("images", {}); store.setdefault("http", {}); store.setdefault("health", {})
+    by_id = {s["id"]: s for s in feeds}
+
+    # 1. fetch all feeds
+    results = {}
+    with cf.ThreadPoolExecutor(max_workers=16) as ex:
+        for sid, items, status, secs, cache in ex.map(lambda s: fetch_source(s, store["http"]), feeds):
+            results[sid] = (items, status)
+            store["http"][sid] = cache
+            h = store["health"].setdefault(sid, {})
+            h["last_status"] = status; h["last_checked"] = NOW.isoformat()
+            if items is not None:
+                h["last_ok"] = NOW.isoformat()
+            log(f"{sid:18} {status:14} {secs:4.1f}s")
+
+    # 2. merge into the store
+    new_ids = []
+    for sid, (items, status) in results.items():
+        if not items:
+            continue
+        src = by_id[sid]
+        for it in items:
+            iid = hashlib.sha1(it["url"].encode()).hexdigest()[:16]
+            pub = it["published"]
+            if pub and dt.datetime.fromisoformat(pub) < NOW - dt.timedelta(days=KEEP_DAYS):
+                continue
+            old = store["items"].get(iid)
+            if old:
+                # refresh mutable bits, keep first-seen
+                old["title"] = it["title"] or old["title"]
+                old["summary"] = it["summary"] or old["summary"]
+                old["image"] = old.get("image") or it["image"]
+                if pub and not old.get("published"):
+                    old["published"] = pub
+                continue
+            rec = {
+                "id": iid, "url": it["url"], "title": it["title"], "summary": it["summary"], "image": it["image"],
+                "published": pub or NOW.isoformat(), "seen": NOW.isoformat(), "source": sid,
+                "section": src["section"], "tags": sorted(set(src.get("tags", []) + ([src["place"]] if src.get("place") else []))),
+                "place": src.get("place"),
+            }
+            store["items"][iid] = rec
+            new_ids.append(iid)
+    log(f"new stories: {len(new_ids)}  store: {len(store['items'])}")
+
+    # 3. prune the store
+    cutoff = NOW - dt.timedelta(days=KEEP_DAYS)
+    for iid in [k for k, v in store["items"].items() if dt.datetime.fromisoformat(v["published"]) < cutoff]:
+        store["items"].pop(iid, None); store["images"].pop(iid, None)
+
+    # 4. photos for stories that came without one (newest first, bounded)
+    budget = int(os.environ.get("OG_BUDGET", "80"))
+    want = [store["items"][i] for i in new_ids if not store["items"][i].get("image") and i not in store["images"]]
+    want.sort(key=lambda r: r["published"], reverse=True)
+    want = want[:budget]
+    if want:
+        with cf.ThreadPoolExecutor(max_workers=12) as ex:
+            for rec, img in zip(want, ex.map(lambda r: og_image(r["url"]), want)):
+                store["images"][rec["id"]] = img or ""
+                if img:
+                    rec["image"] = img
+        log(f"photos looked up: {len(want)}, found: {sum(1 for r in want if r.get('image'))}")
+
+    # 5. weather
+    weather = {}
+    for place in prefs.get("places", []):
+        w = weather_for(place)
+        if w:
+            weather[place["id"]] = w
+
+    # 6. publish bundle (last PUBLISH_DAYS, muted sources removed; blocking happens in the browser
+    #    from the same preferences, so an edit there takes effect without a rebuild)
+    muted = set(prefs.get("muted_sources", []))
+    pub_cutoff = NOW - dt.timedelta(days=PUBLISH_DAYS)
+    items = [v for v in store["items"].values() if v["source"] not in muted and dt.datetime.fromisoformat(v["published"]) >= pub_cutoff]
+    # collapse the same story from several sources
+    seen_titles = {}
+    for v in sorted(items, key=lambda r: by_id.get(r["source"], {}).get("weight", 1), reverse=True):
+        key = norm_title(v["title"])
+        if key in seen_titles:
+            seen_titles[key].setdefault("also", []).append(v["source"])
+            v["_dup"] = True
+        else:
+            seen_titles[key] = v
+    items = [v for v in items if not v.pop("_dup", False)]
+    items.sort(key=lambda r: r["published"], reverse=True)
+    out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also")}
+                 for r in items]
+    bundle = {
+        "generated": NOW.isoformat(),
+        "items": out_items,
+        "weather": weather,
+        "prefs": prefs,
+        "feedback": feedback,
+        "sources": [{"id": s["id"], "name": s["name"], "home": s.get("home"), "section": s["section"], "weight": s.get("weight", 1.0),
+                     "health": store["health"].get(s["id"], {}).get("last_status")} for s in feeds],
+        "stats": {"stories": len(out_items), "new": len(new_ids), "sources_ok": sum(1 for s in feeds if (results.get(s["id"]) or (None, ""))[1].startswith(("ok", "unchanged")))},
+    }
+    os.makedirs(os.path.join(ROOT, "site", "data"), exist_ok=True)
+    raw = json.dumps(bundle, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    enc_path, plain_path = os.path.join(ROOT, "site", "data", "bundle.enc"), os.path.join(ROOT, "site", "data", "bundle.json")
+    if passphrase:
+        with open(enc_path, "wb") as f:
+            f.write(encrypt_bytes(raw, passphrase))
+        if os.path.exists(plain_path):
+            os.remove(plain_path)
+    else:
+        with open(plain_path, "wb") as f:
+            f.write(raw)
+        if os.path.exists(enc_path):
+            os.remove(enc_path)
+    with open(os.path.join(ROOT, "site", "data", "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump({"generated": NOW.isoformat(), "encrypted": bool(passphrase), "stories": len(out_items)}, f)
+    os.makedirs(os.path.dirname(STORE_PATH), exist_ok=True)
+    with open(STORE_PATH, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
+    log(f"published {len(out_items)} stories ({len(raw)//1024} KB{', encrypted' if passphrase else ''}); weather for {len(weather)} places")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+data/
+site/data/bundle.json
+site/data/bundle.enc
+site/data/manifest.json
+config/preferences.json

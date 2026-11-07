@@ -1,0 +1,88 @@
+{
+  "_comment": "Your preferences. Edit here or in the site's Settings (which writes this file back when a token is configured). Blocked terms match whole words, case-insensitive, in title + summary; a hit removes the story at build time and again in the browser.",
+  "_comment_sections": "A section shows stories whose source belongs to it, plus any story (from any source) whose title or summary matches one of its 'match' terms. Add a section or a place the same way.",
+  "blocked_terms": [
+    "example-word",
+    "another phrase"
+  ],
+  "boosted_terms": [
+    "example"
+  ],
+  "muted_sources": [],
+  "hide_threshold": -2,
+  "places": [
+    {
+      "id": "providence",
+      "name": "Providence, RI",
+      "lat": 41.824,
+      "lon": -71.4128,
+      "tz": "America/New_York",
+      "sections": [
+        "local-ri",
+        "brown"
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "world",
+      "name": "World"
+    },
+    {
+      "id": "science",
+      "name": "Science & Tech"
+    },
+    {
+      "id": "ideas",
+      "name": "Ideas & Books"
+    },
+    {
+      "id": "local-ri",
+      "name": "Rhode Island"
+    },
+    {
+      "id": "brown",
+      "name": "Brown",
+      "match": [
+        "Brown University",
+        "Brown Bears",
+        "Brown football",
+        "Brown's football",
+        "College Hill",
+        "Brown Daily Herald"
+      ]
+    },
+    {
+      "id": "local-ne",
+      "name": "New England"
+    },
+    {
+      "id": "garden",
+      "name": "Garden"
+    },
+    {
+      "id": "house",
+      "name": "Old House"
+    },
+    {
+      "id": "cars",
+      "name": "Cars"
+    },
+    {
+      "id": "football",
+      "name": "Football"
+    },
+    {
+      "id": "beer-food",
+      "name": "Beer & Food"
+    },
+    {
+      "id": "travel",
+      "name": "Travel"
+    },
+    {
+      "id": "games",
+      "name": "D&D & Games"
+    }
+  ]
+}

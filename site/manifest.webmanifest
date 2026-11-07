@@ -1,0 +1,13 @@
+{
+  "name": "The Grotto Picayune",
+  "short_name": "Picayune",
+  "description": "A private, ad-free news page.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#1f3a5f",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}
