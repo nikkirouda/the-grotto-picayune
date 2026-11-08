@@ -73,6 +73,25 @@
       "name": "Football"
     },
     {
+      "id": "fantasy",
+      "name": "Fantasy Football",
+      "match": [
+        "fantasy football",
+        "waiver wire",
+        "waivers",
+        "start/sit",
+        "start 'em",
+        "sit 'em",
+        "PPR",
+        "sleepers",
+        "fantasy outlook",
+        "fantasy impact",
+        "fantasy managers",
+        "DFS",
+        "trade value chart"
+      ]
+    },
+    {
       "id": "beer-food",
       "name": "Beer & Food"
     },
