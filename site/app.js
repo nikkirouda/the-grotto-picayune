@@ -17,7 +17,8 @@ let bundle = null;          // {items, weather, prefs, sources, generated}
 let prefs = null;           // effective preferences (bundle prefs + local edits)
 let votes = LS.get('votes', {});        // id -> {v:+1|-1, t:ms, s:source, tags:[...], tok:[...]}
 let read = LS.get('read', {});          // id -> ms
-let opts = Object.assign({ images: true, hideRead: false, showHidden: false, compact: false, hideVideo: false, sort: 'score' }, LS.get('opts', {}));
+let opts = Object.assign({ images: true, hideRead: true, showHidden: false, compact: false, hideVideo: false, sort: 'score' }, LS.get('opts', {}));
+if (!opts.v2) { opts.hideRead = true; opts.v2 = true; LS.set('opts', opts); }   // Captain's word 2026-11-08: a read piece leaves the list
 let route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
 let query = '';
 let shown = 0;
@@ -201,7 +202,7 @@ function visibleItems() {
     if (blockedRe && blockedRe.test(it._text)) { blocked++; continue; }
     const sc = score(it);
     if (!opts.showHidden && sc.L.total <= hideAt && !votes[it.id]) { hidden++; continue; }
-    if (opts.hideRead && read[it.id] && !votes[it.id]) continue;
+    if (opts.hideRead && read[it.id] && !query) continue;      // read pieces leave the lists; search still finds them
     if (opts.hideVideo && it.kind === 'video') continue;
     it._sc = sc;
     out.push(it);

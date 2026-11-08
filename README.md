@@ -72,6 +72,8 @@ site/ (index.html, app.js) ──► GitHub Pages
   minutes later with a note of how many stories are new. ↻ does the same on request. Devices without
   the key read the latest edition and ↻ pulls in a newer one if there is one. If nobody opens the paper
   for a week, GitHub drops the build cache and the next gathering starts the archive afresh.
+- A story you have opened leaves the lists (search still finds it); untick *Hide stories I've opened* in
+  Settings to see them greyed instead.
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.
 - ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
   matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
