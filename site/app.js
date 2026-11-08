@@ -318,7 +318,12 @@ async function openReader(it, n) {
     if (manifest.encrypted) {
       const pass = LS.get('pass', null);
       if (!articleKey) articleKey = await deriveKey(pass, b64ToBytes(manifest.salt), 'decrypt');
-      const fetchBin = () => fetch(`data/a/${it.id}.bin`, { cache: 'no-store' }).then(x => { if (!x.ok) throw new Error('missing'); return x.arrayBuffer(); });
+      const fetchBin = async () => {
+        let x = await fetch(`data/a/${it.id}.bin`, { cache: 'no-store' });
+        if (!x.ok) { await new Promise(r => setTimeout(r, 1500)); x = await fetch(`data/a/${it.id}.bin`, { cache: 'reload' }); }
+        if (!x.ok) throw new Error('missing');
+        return x.arrayBuffer();
+      };
       let buf = new Uint8Array(await fetchBin());
       let plain;
       try {
@@ -355,7 +360,7 @@ async function openReader(it, n) {
     if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
   } catch (e) {
-    $('#readerText').innerHTML = `<p class="muted">The text could not be loaded just now (${esc(e.message)}). Reloading the paper usually fixes it; otherwise <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">read it at ${esc(it._src)} ↗</a>.</p>`;
+    $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">The full text is not in the paper just now (${esc(e.message)}). <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a>, or try again after the next edition.</p>`;
   }
 }
 function imgKey(u) { try { const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }

@@ -611,10 +611,13 @@ def main():
             seen_titles[key] = v
     items = [v for v in items if not v.pop("_dup", False)]
     items.sort(key=lambda r: r["published"], reverse=True)
+    # Article files are built ONCE per story and kept in the cache (data/blobs), so the published file for a
+    # story never changes between builds and never disappears while the story is in the window. GitHub's CDN
+    # serves the bundle and the files from caches that update at different moments; identical, long-lived
+    # files are what keeps an open page from asking for an article that is "missing".
     adir = os.path.join(ROOT, "site", "data", "a")
     shutil.rmtree(adir, ignore_errors=True)
     os.makedirs(adir, exist_ok=True)
-    # one stable salt per site (kept with the archive), so a page opened before a rebuild still unlocks articles
     salt_path = os.path.join(os.path.dirname(STORE_PATH), "salt.bin")
     try:
         with open(salt_path, "rb") as f:
@@ -626,22 +629,43 @@ def main():
         with open(salt_path, "wb") as f:
             f.write(salt)
     ckey = derive_key(passphrase, salt) if passphrase else None
+    blobs = os.path.join(os.path.dirname(STORE_PATH), "blobs")
+    os.makedirs(blobs, exist_ok=True)
+    salt_mark = os.path.join(blobs, ".salt")
+    mark = (salt.hex() if ckey else "plain")
+    if not (os.path.exists(salt_mark) and open(salt_mark).read().strip() == mark):
+        for name in os.listdir(blobs):
+            if not name.startswith("."):
+                os.remove(os.path.join(blobs, name))
+        with open(salt_mark, "w") as f:
+            f.write(mark)
+    ext = ".bin" if ckey else ".json"
     readable = 0
+    live_ids = set()
     for r in items:
+        r.pop("reader", None)          # never trust last build's flag: it is set below only when the file exists
         if not r.get("kind"):
             r["kind"] = story_kind(r["url"], r["title"])
-        ap = os.path.join(ARTICLES_DIR, r["id"] + ".json")
-        art = load_json(ap, {}) if os.path.exists(ap) else {}
-        txt = art.get("text")
-        if not txt:
-            continue
-        hero = _img_key(r["image"]) if r.get("image") else None
-        images = [im for im in art.get("images", []) if _img_key(im["src"]) != hero]
-        body = json.dumps({"id": r["id"], "text": txt, "html": art.get("html"), "images": images}, ensure_ascii=False).encode("utf-8")
-        with open(os.path.join(adir, r["id"] + (".bin" if ckey else ".json")), "wb") as f:
-            f.write(encrypt_with_key(body, ckey) if ckey else body)
-        r["reader"] = len(txt.split())
+        live_ids.add(r["id"])
+        blob_path = os.path.join(blobs, r["id"] + ext)
+        if not os.path.exists(blob_path):
+            ap = os.path.join(ARTICLES_DIR, r["id"] + ".json")
+            art = load_json(ap, {}) if os.path.exists(ap) else {}
+            txt = art.get("text")
+            if not txt:
+                continue
+            hero = _img_key(r["image"]) if r.get("image") else None
+            images = [im for im in art.get("images", []) if _img_key(im["src"]) != hero]
+            body = json.dumps({"id": r["id"], "text": txt, "html": art.get("html"), "images": images, "words": len(txt.split())}, ensure_ascii=False).encode("utf-8")
+            with open(blob_path, "wb") as f:
+                f.write(encrypt_with_key(body, ckey) if ckey else body)
+        shutil.copyfile(blob_path, os.path.join(adir, r["id"] + ext))
+        words = load_json(os.path.join(ARTICLES_DIR, r["id"] + ".json"), {}).get("text") or ""
+        r["reader"] = len(words.split()) if words else 200
         readable += 1
+    for name in os.listdir(blobs):
+        if not name.startswith(".") and name.rsplit(".", 1)[0] not in live_ids:
+            os.remove(os.path.join(blobs, name))
     out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also", "reader", "kind")}
                  for r in items]
     bundle = {
