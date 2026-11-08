@@ -90,11 +90,11 @@
     </details>
 
     <details>
-      <summary>Sync between devices</summary>
-      <p class="muted small">Votes and preferences live in this browser. To share them between laptop and phone (and to let the hourly build use your blocked words), paste a GitHub fine-grained token for this site's repository with <b>Contents: read &amp; write</b> and <b>Actions: read &amp; write</b>. It never leaves this device except to talk to GitHub.</p>
+      <summary>Owner's key: gathering and sync</summary>
+      <p class="muted small">The paper gathers fresh stories only when a device holding the owner's key opens it or taps ↻. Paste a GitHub fine-grained token for this site's repository with <b>Actions: read &amp; write</b> (for gathering) and <b>Contents: read &amp; write</b> (to share votes and preferences between your devices). It never leaves this device except to talk to GitHub. Readers without the key see the latest edition and can pull a newer one with ↻.</p>
       <label>Repository <input id="repo" placeholder="owner/name"></label>
       <label>Token <input id="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
-      <div class="row"><button id="syncBtn">Sync now</button><button id="rebuildBtn">Refresh the news now</button></div>
+      <div class="row"><button id="syncBtn">Sync now</button><button id="rebuildBtn">Gather fresh stories now</button></div>
       <p id="syncMsg" class="muted small"></p>
     </details>
 

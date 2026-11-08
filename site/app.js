@@ -407,29 +407,49 @@ function setStatus(t) { const s = $('#status'); s.textContent = t; s.classList.t
 let flashTimer = null;
 function flash(t, ms = 5000) { setStatus(t); clearTimeout(flashTimer); flashTimer = setTimeout(() => { if ($('#status').textContent === t) setStatus(''); }, ms); }
 
-// ------------------------------------------------------------- refresh: the paper is gathered on GitHub's clock;
-// this pulls the newest edition into an open page (and the page checks on its own when it comes back to the front)
-let lastCheck = 0, lastManual = 0;
-async function refreshNews(manual) {
-  const btn = $('#refreshBtn');
-  if (btn.classList.contains('busy')) return;
-  btn.classList.add('busy'); lastCheck = Date.now();
-  try {
-    const mf = await fetch('data/manifest.json', { cache: 'no-store' }).then(r => r.json());
-    if (mf.generated !== manifest.generated) {
-      const had = new Set(bundle.items.map(i => i.id));
-      await loadBundle();
-      const fresh = bundle.items.filter(i => !had.has(i.id)).length;
-      renderTabs(); buildList();
-      flash(`Fresh edition: ${fresh} new stor${fresh === 1 ? 'y' : 'ies'} since you opened the paper.`);
-    } else if (manual) {
-      const token = LS.get('token', '');
-      if (token && Date.now() - lastManual < 6000) { lastManual = 0; await rebuild(); flash($('#syncMsg').textContent || 'Rebuild started.', 8000); }
-      else { lastManual = Date.now(); flash(`Up to date: this edition was gathered ${ago(manifest.generated)}; the next is gathered at 17 past each hour.${token ? ' Tap ↻ again to gather one now.' : ''}`, 7000); }
-    }
-  } catch (e) { if (manual) flash('Could not reach the paper just now.'); }
-  btn.classList.remove('busy');
+// ------------------------------------------------------------- gathering: the paper is gathered only when a
+// device holding the owner's token opens it or taps ↻. The page asks GitHub to run the build, then watches for
+// the new edition and slides it in. A fresh gathering takes two to three minutes. Devices without the token
+// (friends) read the latest edition and can pull in a newer one with ↻, but cannot start a gathering.
+let lastCheck = 0, gathering = false, pollTimer = null;
+const buildAgeMin = () => (Date.now() - new Date(manifest.generated || 0).getTime()) / 60000;
+async function pullNewer() {
+  const mf = await fetch('data/manifest.json', { cache: 'no-store' }).then(r => r.json());
+  if (mf.generated === manifest.generated) return false;
+  const had = new Set(bundle.items.map(i => i.id));
+  await loadBundle();
+  const fresh = bundle.items.filter(i => !had.has(i.id)).length;
+  renderTabs(); buildList();
+  flash(`Fresh edition: ${fresh} new stor${fresh === 1 ? 'y' : 'ies'}.`);
+  return true;
 }
+async function gather(manual) {
+  const btn = $('#refreshBtn');
+  if (gathering) { if (manual) flash('Still gathering; the new edition arrives in a minute or two.'); return; }
+  lastCheck = Date.now();
+  try {
+    if (await pullNewer()) return;                       // a newer edition was already waiting
+    const canAsk = !!LS.get('token', '') && !!(LS.get('repo', guessRepo()));
+    if (!canAsk) {
+      if (manual) flash(`Up to date with the latest edition, gathered ${ago(manifest.generated)}. New editions are gathered when the owner opens the paper.`, 8000);
+      return;
+    }
+    if (!manual && buildAgeMin() < 15) return;            // fresh enough; nothing to do on open
+    if (manual && buildAgeMin() < 2) { flash('This edition is only minutes old.'); return; }
+    gathering = true; btn.classList.add('busy');
+    const running = await gh('actions/runs?per_page=5').then(d => (d.workflow_runs || []).some(r => r.status === 'in_progress' || r.status === 'queued')).catch(() => false);
+    if (!running) await gh('actions/workflows/build.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+    setStatus('Gathering fresh stories… usually two to three minutes. The current edition stays readable meanwhile.');
+    const started = Date.now();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try { if (await pullNewer()) stopGather(); } catch {}
+      if (Date.now() - started > 8 * 60e3) { stopGather(); flash('The gathering is taking longer than usual; tap ↻ in a few minutes.'); }
+    }, 20000);
+  } catch (e) { stopGather(); if (manual) flash(`Could not start a gathering (${e.message}).`); }
+}
+function stopGather() { gathering = false; clearInterval(pollTimer); $('#refreshBtn').classList.remove('busy'); if ($('#status').textContent.startsWith('Gathering')) setStatus(''); }
+async function refreshNews(manual) { return gather(manual); }
 
 // ------------------------------------------------------------- weather
 async function localWeather(p) {
@@ -630,7 +650,7 @@ function wireSettings() {
   $('#repo').onchange = e => LS.set('repo', e.target.value.trim());
   $('#token').onchange = e => LS.set('token', e.target.value.trim());
   $('#syncBtn').onclick = () => sync(true);
-  $('#rebuildBtn').onclick = rebuild;
+  $('#rebuildBtn').onclick = () => { openSettings(false); gather(true); };
   $('#exportBtn').onclick = () => {
     const blob = new Blob([JSON.stringify({ votes, prefsLocal: LS.get('prefsLocal', {}), read, opts }, null, 1)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `picayune-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
@@ -648,7 +668,7 @@ function wireSettings() {
   $$('.sort button').forEach(b => b.onclick = () => { opts.sort = b.dataset.sort; LS.set('opts', opts); buildList(); });
   $('#moreBtn').onclick = renderMore;
   $('#refreshBtn').onclick = () => refreshNews(true);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bundle && Date.now() - lastCheck > 10 * 60e3) refreshNews(false); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bundle && Date.now() - lastCheck > 10 * 60e3) gather(false); });
   $('#readerBack').onclick = () => closeReader(false);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && readerItem) closeReader(false); });
   window.addEventListener('popstate', () => { if (readerItem && !location.hash.endsWith('/read')) closeReader(true); });
@@ -718,6 +738,7 @@ async function rebuild() {
   try { await loadBundle(); } catch (e) { setStatus('The news bundle is not here yet. The first build publishes it within a few minutes.'); console.error(e); return; }
   renderTabs(); buildList();
   if (!LS.get('welcomed', false) && !LS.get('prefsLocal', null) && !Object.keys(votes).length) openWelcome();
+  gather(false);                                         // opening the paper is what gathers it
   if (LS.get('token', '') && Date.now() - LS.get('lastSync', 0) > 10 * 60e3) sync(false);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

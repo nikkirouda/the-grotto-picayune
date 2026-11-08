@@ -1,8 +1,8 @@
 # The Grotto Picayune
 
 A private, ad-free news page: it shows what you care about, skips what you don't, and keeps local
-sections for the places that matter. Static site on GitHub Pages, rebuilt every hour by GitHub Actions
-from free sources that need no login. Works on a laptop or a phone (add it to the home screen).
+sections for the places that matter. Static site on GitHub Pages, gathered by GitHub Actions from free
+sources that need no login, only when the owner opens the paper or taps ↻. Works on a laptop or a phone (add it to the home screen).
 Search covers the last seven days.
 
 **Public engine, private newspaper.** This repository is public so that GitHub Pages is free, but
@@ -32,7 +32,7 @@ site/ (index.html, app.js) ──► GitHub Pages
   weather) and the sections. A section can also be a *lens*: a list of `match` terms that pulls
   matching stories from every source (that is how Brown University gets a section without a feed).
   `config/preferences.example.json` shows the shape.
-- **The build** fetches all feeds in parallel, de-duplicates, trims tracking parameters, finds a photo
+- **The build** runs on request (see Gathering), fetches all feeds in parallel, de-duplicates, trims tracking parameters, finds a photo
   (feed media first, then the article's `og:image` for up to 80 stories a run), pulls Open-Meteo
   weather for each place, and writes the bundle.
 - **The reader.** For up to 250 new stories a run the build also visits the story and keeps its readable
@@ -59,16 +59,19 @@ site/ (index.html, app.js) ──► GitHub Pages
    `private.enc` was made with. (Without it the build cannot read your sources and stops.)
 3. Actions → *build* → *Run workflow*. The site appears at `https://<user>.github.io/<repo>/` and asks
    for the passphrase.
-4. Optional: a fine-grained personal access token scoped to this repository with
-   **Contents: read & write** and **Actions: read & write**; paste it in the site's Settings →
-   *Sync between devices*. It enables write-back of votes and preferences and the
-   *Refresh the news now* button.
+4. **The owner's key**, required for the paper to gather at all: a fine-grained personal access token
+   scoped to this repository with **Actions: read & write** and **Contents: read & write**; paste it in
+   the site's Settings → *Owner's key* on each of your own devices. It is kept in that browser only.
+   The Contents permission also syncs votes and preferences between your devices.
 
 ## Everyday
 
-- The paper is gathered on GitHub's clock (17 past each hour) and every opening shows the newest edition.
-  ↻ up top pulls a newer edition into a page that has been sitting open; the page also checks on its own
-  when it comes back to the front. With the owner's token, a second tap of ↻ gathers a fresh edition now.
+- **Gathering happens on demand, never on a clock.** On a device holding the owner's key, opening the
+  paper (or bringing it back to the front after a while) shows the last edition at once and, if that
+  edition is more than fifteen minutes old, asks GitHub to gather a fresh one; it slides in two to three
+  minutes later with a note of how many stories are new. ↻ does the same on request. Devices without
+  the key read the latest edition and ↻ pulls in a newer one if there is one. If nobody opens the paper
+  for a week, GitHub drops the build cache and the next gathering starts the archive afresh.
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.
 - ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
   matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
