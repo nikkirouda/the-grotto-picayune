@@ -484,26 +484,61 @@ function renderWeather() {
   w.classList.toggle('hidden', !cards.length);
 }
 
-// ------------------------------------------------------------- tabs
+// ------------------------------------------------------------- tabs and the sections menu
+// Every section the reader can open, in the paper's own order: [{id, name, kind}].
+function sectionEntries() {
+  const placeSecs = new Set((prefs.places || []).map(p => p.sections[0]));
+  const hidden = hiddenSet();
+  const out = [{ id: 'foryou', name: 'For you', kind: '' }, { id: 'latest', name: 'Latest', kind: '' }];
+  for (const p of allPlaces().filter(p => !hidden.has('place:' + p.id))) out.push({ id: 'place:' + p.id, name: p.name.split(',')[0].replace(' & New England', ''), kind: 'place' });
+  for (const s of (prefs.sections || []).filter(s => !placeSecs.has(s.id) && !hidden.has(s.id))) out.push({ id: s.id, name: s.name, kind: 'section' });
+  const subs = subscribedSet();
+  for (const x of publications().filter(x => subs.has(x.id))) out.push({ id: 'pub:' + x.id, name: x.name.replace(/^The /, ''), kind: 'paper' });
+  return out;
+}
+// Visits per section on this device (Captain's word 2026-11-09: the menu puts the most-read first).
+// Each visit counts 1, fading by half every 30 days so the order follows what he reads now.
+const VISIT_HALF_LIFE = 30 * 864e5;
+let visits = LS.get('visits', {});        // id -> {n, t}
+function visitScore(id, now = Date.now()) { const v = visits[id]; return v ? v.n * Math.pow(0.5, (now - v.t) / VISIT_HALF_LIFE) : 0; }
+function countVisit(id) {
+  if (!id) return;
+  const now = Date.now();
+  visits[id] = { n: visitScore(id, now) + 1, t: now };
+  LS.set('visits', visits);
+}
 function renderTabs() {
   const t = $('#tabs');
   const link = (id, name) => `<a href="#/${id}" data-r="${id}" class="${route === id ? 'active' : ''}">${esc(name)}</a>`;
-  const placeSecs = new Set((prefs.places || []).map(p => p.sections[0]));
-  const hidden = hiddenSet();
-  let h = link('foryou', 'For you') + link('latest', 'Latest') + '<span class="sep"></span>';
-  h += allPlaces().filter(p => !hidden.has('place:' + p.id)).map(p => link('place:' + p.id, p.name.split(',')[0].replace(' & New England', ''))).join('');
-  h += '<span class="sep"></span>';
-  h += (prefs.sections || []).filter(s => !placeSecs.has(s.id) && !hidden.has(s.id)).map(s => link(s.id, s.name)).join('');
-  const subs = subscribedSet();
-  const pubs = publications().filter(x => subs.has(x.id));
-  if (pubs.length) h += '<span class="sep"></span>' + pubs.map(x => link('pub:' + x.id, x.name.replace(/^The /, ''))).join('');
+  const entries = sectionEntries();
+  let h = '', last = null;
+  for (const e of entries) {
+    const grp = e.kind || 'top';
+    if (last && grp !== last) h += '<span class="sep"></span>';
+    h += link(e.id, e.name); last = grp;
+  }
   t.innerHTML = h;
   const a = $('#tabs a.active'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' });
+  renderMenu(entries);
+}
+function renderMenu(entries = sectionEntries()) {
+  const now = Date.now();
+  const ranked = entries.map((e, i) => ({ e, i, s: visitScore(e.id, now) })).sort((a, b) => (b.s - a.s) || (a.i - b.i)).map(x => x.e);
+  const label = { place: 'place', section: '', paper: 'subscriber' };
+  $('#menuList').innerHTML = ranked.map(e => `<a href="#/${e.id}" class="${route === e.id && !query ? 'active' : ''}"><span>${esc(e.name)}</span><span class="kind">${label[e.kind] || ''}</span></a>`).join('')
+    + '<p class="note muted small">Your most-read sections come first, on this device.</p>';
+  $$('#menuList a').forEach(a => a.onclick = () => openMenu(false));
+}
+function openMenu(open) {
+  if (open) { openSettings(false); openTopics(false); renderMenu(); }
+  $('#menu').classList.toggle('open', open); $('#scrim').classList.toggle('show', open);
+  $('#menu').setAttribute('aria-hidden', String(!open)); $('#menuBtn').setAttribute('aria-expanded', String(open));
 }
 function go() {
   if (location.hash.endsWith('/read')) { if (!readerItem) history.replaceState(null, '', location.hash.replace(/\/read$/, '')); else return; }
   route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
   query = ''; $('#q').value = '';
+  countVisit(route);
   renderTabs(); buildList(); window.scrollTo(0, 0);
 }
 
@@ -576,8 +611,8 @@ function wireWelcome() {
   $('#wKeep').onclick = () => closeWelcome(false);
   $('#rerunWelcome').onclick = () => { openSettings(false); openWelcome(); };
 }
-function openSettings(open) { if (open) openTopics(false); $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) fillSettings(); }
-function openTopics(open) { if (open) openSettings(false); $('#topics').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#topics').setAttribute('aria-hidden', String(!open)); if (open) { fillTopics(); setTimeout(() => $('#addBoost input').focus(), 250); } }
+function openSettings(open) { if (open) { openTopics(false); openMenu(false); } $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) fillSettings(); }
+function openTopics(open) { if (open) { openSettings(false); openMenu(false); } $('#topics').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#topics').setAttribute('aria-hidden', String(!open)); if (open) { fillTopics(); setTimeout(() => $('#addBoost input').focus(), 250); } }
 function countHits(term) {
   const re = termRegex([term]); if (!re) return 0;
   let n = 0; for (const it of bundle.items) if (re.test(it._text)) n++; return n;
@@ -645,7 +680,9 @@ function wireSettings() {
   $('#closeSettings').onclick = () => openSettings(false);
   $('#topicsBtn').onclick = () => openTopics(true);
   $('#closeTopics').onclick = () => openTopics(false);
-  $('#scrim').onclick = () => { openSettings(false); openTopics(false); };
+  $('#menuBtn').onclick = () => openMenu(!$('#menu').classList.contains('open'));
+  $('#closeMenu').onclick = () => openMenu(false);
+  $('#scrim').onclick = () => { openSettings(false); openTopics(false); openMenu(false); };
   $('#addBoost').onsubmit = e => { e.preventDefault(); addTerm('boosted_terms', $('#addBoost input')); };
   $('#addBlock').onsubmit = e => { e.preventDefault(); addTerm('blocked_terms', $('#addBlock input')); };
   const opt = (id, key, after) => $(id).onchange = e => { opts[key] = e.target.checked; LS.set('opts', opts); document.body.classList.toggle('compact', opts.compact); buildList(); };
@@ -678,7 +715,7 @@ function wireSettings() {
   $('#refreshBtn').onclick = () => refreshNews(true);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bundle && Date.now() - lastCheck > 10 * 60e3) gather(false); });
   $('#readerBack').onclick = () => closeReader(false);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && readerItem) closeReader(false); });
+  document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (readerItem) closeReader(false); else if ($('#menu').classList.contains('open')) openMenu(false); });
   window.addEventListener('popstate', () => { if (readerItem && !location.hash.endsWith('/read')) closeReader(true); });
   let qt; $('#q').addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { query = e.target.value.trim(); if (query) $$('#tabs a').forEach(a => a.classList.remove('active')); else renderTabs(); buildList(); }, 180); });
   $('#searchForm').addEventListener('submit', e => e.preventDefault());
@@ -752,6 +789,7 @@ async function rebuild() {
   wireSettings(); wireWelcome();
   window.addEventListener('hashchange', go);
   try { await loadBundle(); } catch (e) { setStatus('The news bundle is not here yet. The first build publishes it within a few minutes.'); console.error(e); return; }
+  countVisit(route);
   renderTabs(); buildList();
   if (!LS.get('welcomed', false) && !LS.get('prefsLocal', null) && !Object.keys(votes).length) openWelcome();
   gather(false);                                         // opening the paper is what gathers it

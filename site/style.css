@@ -113,12 +113,27 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 .source-list .st.bad { color: var(--dislike); }
 .learned { font-size: .85rem; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 8px 0; }
 .learned span.pos { color: var(--like); } .learned span.neg { color: var(--dislike); }
+.drawer.left { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); transform: translateX(-100%); }
+.drawer.left.open { transform: none; }
+.menu-btn { display: none; flex: 0 0 38px; }
+.menu-list { padding: 6px 8px 40px; display: flex; flex-direction: column; }
+.menu-list a { display: flex; align-items: center; gap: 10px; padding: 12px 12px; border-radius: 10px; font-size: 1.05rem; }
+.menu-list a:hover { background: var(--line); }
+.menu-list a.active { background: var(--accent); color: var(--accent-ink); }
+.menu-list a .kind { margin-left: auto; font-size: .75rem; color: var(--muted); }
+.menu-list a.active .kind { color: inherit; opacity: .8; }
+.menu-list .note { padding: 14px 12px 0; }
 .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; }
 .scrim.show { opacity: 1; pointer-events: auto; }
 
 @media (max-width: 640px) {
   .masthead { gap: 8px; padding: 8px 12px 6px; flex-wrap: wrap; }
   .brand { flex: 1; }
+  .menu-btn { display: inline-block; margin-left: -6px; }
+  .masthead .brand { flex: 1 1 0; min-width: 0; overflow: hidden; gap: 6px; font-size: 1.02rem; }
+  .masthead .icon-btn { width: 34px; height: 34px; flex: 0 0 34px; font-size: 1.1rem; }
+  .tools { gap: 0; }
+  .tabs { display: none; }
   .search { order: 3; flex: 0 0 100%; }
   .search input { font-size: 1.05rem; padding: 10px 14px; }
   .brand { font-size: 1.1rem; }
