@@ -19,7 +19,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write           # only for the weekly heartbeat commit that keeps the daily schedule alive
+  contents: write           # the weekly heartbeat commit, and the one-time re-lock of private.enc
   pages: write
   id-token: write
 
@@ -50,10 +50,18 @@ jobs:
       - name: Fetch sources and build the bundle
         env:
           NEWS_PASSPHRASE: ${{ secrets.NEWS_PASSPHRASE }}
+          PRIVATE_PASSPHRASE: ${{ secrets.PRIVATE_PASSPHRASE }}
           QUICK: ${{ inputs.quick }}
           ARTICLE_BUDGET: ${{ (github.event_name == 'schedule' || inputs.full) && '4000' || '' }}
           OG_BUDGET: ${{ (github.event_name == 'schedule' || inputs.full) && '400' || '' }}
         run: python3 build/fetch.py
+      - name: Keep private.enc re-locked with the owner's key (once, after PRIVATE_PASSPHRASE is added)
+        run: |
+          if ! git diff --quiet -- private.enc; then
+            git config user.name "picayune-bot"
+            git config user.email "picayune-bot@users.noreply.github.com"
+            git add private.enc && git commit -q -m "private: re-locked with the owner's key [skip ci]" && git push -q origin HEAD:main || echo "re-lock push skipped"
+          fi
       - name: Save the archive for the next run
         if: always()
         uses: actions/cache/save@v4

@@ -8,7 +8,7 @@ Search covers the last seven days.
 **Public engine, private newspaper.** This repository is public so that GitHub Pages is free, but
 nothing personal is in the clear:
 
-| In the open | Encrypted (`private.enc`, key = the `NEWS_PASSPHRASE` secret) | Not in the repo at all |
+| In the open | Encrypted (`private.enc`, key = the owner's `PRIVATE_PASSPHRASE` secret; friends' `NEWS_PASSPHRASE` opens only the paper) | Not in the repo at all |
 |---|---|---|
 | the code, this README | your extra sources (the places), your preferences (blocked and boosted words, places, lenses, muted sources), your votes | the 14-day archive (lives in the Actions cache), the published bundle is encrypted too |
 | `feeds.yml`: generic sources (world, science, hobbies, Rhode Island) | | |
@@ -85,8 +85,8 @@ site/ (index.html, app.js) ──► GitHub Pages
 - To add a public source: a line in `feeds.yml`, commit. To add a place or a private source, or to
   change preferences by hand:
   ```bash
-  NEWS_PASSPHRASE=… python3 build/private.py show > p.json   # edit p.json
-  NEWS_PASSPHRASE=… python3 build/private.py put --from p.json && git commit -am "private: …"
+  PRIVATE_PASSPHRASE=… python3 build/private.py show > p.json   # edit p.json
+  PRIVATE_PASSPHRASE=… python3 build/private.py put --from p.json && git commit -am "private: …"
   ```
 
 ## Subscriber publications
@@ -123,3 +123,11 @@ python3 -m http.server -d site 8000     # then open http://localhost:8000
 - Old House Journal and This Old House answered with errors on day one and were kept in case it was
   temporary; source status shows in Settings → Sources after every build.
 - Open-Meteo rate-limits shared addresses; a missing weather card means that hour's call was refused.
+
+## Two keys (security review 2026-11-09)
+
+- `NEWS_PASSPHRASE` — the paper's key. Friends have it; it opens the published edition only.
+- `PRIVATE_PASSPHRASE` — the owner's key, for `private.enc` (sources, places, preferences, votes). Add it as
+  a repository secret; the next build re-locks `private.enc` with it and commits the change. The site's
+  settings sync asks for it once per device. Until it exists, the build falls back to `NEWS_PASSPHRASE`.
+- Older copies of `private.enc` in this repository's history stay locked with the shared key.

@@ -667,7 +667,7 @@ function wireSettings() {
     const f = e.target.files[0]; if (!f) return;
     try { const d = JSON.parse(await f.text()); if (d.votes) { votes = Object.assign(votes, d.votes); LS.set('votes', votes); } if (d.prefsLocal) LS.set('prefsLocal', Object.assign(LS.get('prefsLocal', {}), d.prefsLocal)); prefs = effectivePrefs(); compilePrefs(); rebuildModel(); fillSettings(); buildList(); alert('Imported.'); } catch { alert('That file could not be read.'); }
   };
-  $('#forgetPass').onclick = () => { LS.del('pass'); location.reload(); };
+  $('#forgetPass').onclick = () => { LS.del('pass'); LS.del('ownerPass'); location.reload(); };
   $('#themeBtn').onclick = () => {
     const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const next = cur === 'dark' ? 'light' : 'dark';
@@ -698,12 +698,20 @@ async function gh(path, opts = {}) {
 async function sync(manual) {
   const msg = t => { $('#syncMsg').textContent = t; };
   try {
-    const pass = LS.get('pass', null);
-    if (!pass) throw new Error('Sync needs the passphrase (the page is not set up as encrypted, or you have not unlocked it).');
+    // Your private file has its own key (security review 2026-11-09): friends' paper passphrase can't open it.
+    let own = LS.get('ownerPass', null);
+    if (!own) { own = (window.prompt('Your own passphrase for your private file (the PRIVATE_PASSPHRASE secret). Asked once on this device.') || '').trim(); if (!own) throw new Error('Sync needs your own passphrase.'); }
     msg('Syncing…');
     const pf = await gh('contents/private.enc');
     if (!pf) throw new Error('private.enc is not in the repository yet.');
-    const priv = JSON.parse(new TextDecoder().decode(await decrypt(b64ToBytes(pf.content).buffer, pass)));
+    const blob0 = b64ToBytes(pf.content).buffer;
+    let pass = own, priv;
+    try { priv = JSON.parse(new TextDecoder().decode(await decrypt(blob0, own))); LS.set('ownerPass', own); }
+    catch {
+      const shared = LS.get('pass', null);   // before the build re-locks it, the file may still use the shared key
+      try { priv = JSON.parse(new TextDecoder().decode(await decrypt(blob0, shared))); pass = shared; LS.set('ownerPass', own); }
+      catch { LS.del('ownerPass'); throw new Error('That passphrase did not open your private file.'); }
+    }
     const fb = priv.feedback || {};
     // votes: merge by newest timestamp per story; deletions carry a timestamp too
     const merged = Object.assign({}, fb.votes || {});

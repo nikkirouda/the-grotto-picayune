@@ -4,7 +4,8 @@ pull the weather for each place, and write the bundle the site reads.
 
 Run from the repo root:  python3 build/fetch.py
 Environment:
-  NEWS_PASSPHRASE   unlocks private.enc (your extra sources, preferences and votes) and encrypts the
+  PRIVATE_PASSPHRASE unlocks private.enc (your extra sources, preferences and votes) — yours alone.
+  NEWS_PASSPHRASE   encrypts the
                     published bundle (site/data/bundle.enc). The site asks for it once per device.
                     Without it, and without a private.enc, the build runs on feeds.yml plus
                     config/preferences.json (or the example file) and publishes in the clear.
@@ -492,7 +493,7 @@ def weather_for(place, attempt=0):
 def main():
     passphrase = os.environ.get("NEWS_PASSPHRASE", "").strip()
     feeds = yaml.safe_load(open(os.path.join(ROOT, "feeds.yml"), encoding="utf-8"))["sources"]
-    private = load_private(passphrase)
+    private = load_private()   # the owner's key (PRIVATE_PASSPHRASE), never needed by readers
     if private:
         feeds = feeds + list(private.get("sources", []))
         prefs = private.get("preferences", {})
