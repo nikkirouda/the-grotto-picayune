@@ -16,6 +16,7 @@
 <body>
 <header class="top">
   <div class="masthead">
+    <button class="icon-btn menu-btn" id="menuBtn" title="Sections" aria-label="Sections" aria-controls="menu" aria-expanded="false">☰</button>
     <a class="brand" href="#/foryou"><span class="brand-mark" aria-hidden="true"></span>The Grotto Picayune</a>
     <form class="search" id="searchForm" role="search" onsubmit="return false">
       <input id="q" type="search" placeholder="Search the week's stories" autocomplete="off" aria-label="Search">
@@ -119,6 +120,10 @@
 
     <p class="muted small" id="buildInfo"></p>
   </div>
+</aside>
+<aside id="menu" class="drawer left" aria-hidden="true" aria-label="Sections">
+  <div class="drawer-head"><h2>Sections</h2><button class="icon-btn" id="closeMenu" aria-label="Close">✕</button></div>
+  <nav class="drawer-body menu-list" id="menuList"></nav>
 </aside>
 <aside id="topics" class="drawer" aria-hidden="true">
   <div class="drawer-head"><h2>Topics</h2><button class="icon-btn" id="closeTopics" aria-label="Close">✕</button></div>

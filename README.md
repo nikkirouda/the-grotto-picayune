@@ -77,6 +77,8 @@ site/ (index.html, app.js) ──► GitHub Pages
 - A story you have opened leaves the lists (search still finds it); untick *Hide stories I've opened* in
   Settings to see them greyed instead.
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.
+- On a phone the tab strip folds into ☰ **Sections** (top left). The list puts the sections you open most
+  first — counted on that device only, each visit fading by half over 30 days so it follows what you read now.
 - ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
   matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
 - A headline marked *in the paper* opens inside the page; ⌘/Ctrl-click still opens the source.
