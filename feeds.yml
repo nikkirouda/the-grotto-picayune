@@ -62,7 +62,6 @@ sources:
   - {id: craftsman-blog, name: The Craftsman Blog, url: "https://thecraftsmanblog.com/feed/", home: "https://thecraftsmanblog.com", section: house, tags: [old-house, diy], weight: 1.2}
   - {id: circa, name: Circa Old Houses, url: "https://circaoldhouses.com/feed/", home: "https://circaoldhouses.com", section: house, tags: [old-house], weight: 0.9}
   - {id: family-handyman, name: Family Handyman, url: "https://www.familyhandyman.com/feed/", home: "https://www.familyhandyman.com", section: house, tags: [diy], weight: 0.8}
-  - {id: bat, name: Bring a Trailer, url: "https://bringatrailer.com/feed/", home: "https://bringatrailer.com", section: cars, tags: [cars, vintage], weight: 0.8}
   - {id: hagerty, name: Hagerty Media, url: "https://www.hagerty.com/media/feed/", home: "https://www.hagerty.com/media", section: cars, tags: [cars, vintage], weight: 1.2}
   - {id: the-drive, name: The Drive, url: "https://www.thedrive.com/feed", home: "https://www.thedrive.com", section: cars, tags: [cars], weight: 0.8}
   - {id: silodrome, name: Silodrome, url: "https://silodrome.com/feed/", home: "https://silodrome.com", section: cars, tags: [cars, vintage], weight: 0.9}
@@ -108,6 +107,11 @@ sources:
   - {id: onion,        name: The Onion,                   url: "https://theonion.com/feed/", home: "https://theonion.com", section: fun, tags: [fun, satire], weight: 1.1}
   - {id: mcsweeneys,   name: "McSweeney's Internet Tendency", url: "https://www.mcsweeneys.net/rss", home: "https://www.mcsweeneys.net", section: fun, tags: [fun, satire, books], weight: 1.1}
   - {id: autopian,     name: The Autopian,                url: "https://www.theautopian.com/feed/", home: "https://www.theautopian.com", section: cars, tags: [cars, fun], weight: 1.2}
+  # ---- Cars, real news (Captain's word 2026-11-09: Bring a Trailer dropped — auction listings, not news) ----
+  - {id: road-track,   name: Road & Track,                url: "https://www.roadandtrack.com/rss/all.xml/", home: "https://www.roadandtrack.com", section: cars, tags: [cars], weight: 1.1}
+  - {id: car-driver,   name: Car and Driver,              url: "https://www.caranddriver.com/rss/all.xml/", home: "https://www.caranddriver.com", section: cars, tags: [cars], weight: 1.0}
+  - {id: grm,          name: Grassroots Motorsports,      url: "https://grassrootsmotorsports.com/feeds/articles/", home: "https://grassrootsmotorsports.com", section: cars, tags: [cars, diy], weight: 1.0}
+  - {id: classic-ms,   name: Classic Motorsports,         url: "https://classicmotorsports.com/feeds/articles/", home: "https://classicmotorsports.com", section: cars, tags: [cars, vintage, diy], weight: 1.0}
   # ---- Football, the whole league; and Fantasy Football on its own (Captain's word 2026-11-07) ----
   - {id: cbs-nfl,      name: CBS Sports NFL,              url: "https://www.cbssports.com/rss/headlines/nfl/", home: "https://www.cbssports.com/nfl/", section: football, tags: [nfl], weight: 1.2}
   - {id: yahoo-nfl,    name: Yahoo Sports NFL,            url: "https://sports.yahoo.com/nfl/rss/", home: "https://sports.yahoo.com/nfl/", section: football, tags: [nfl], weight: 0.8}
