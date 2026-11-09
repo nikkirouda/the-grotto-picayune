@@ -201,7 +201,7 @@ def og_image(url):
     except Exception:
         return ""
 
-ARTICLE_VERSION = 3
+ARTICLE_VERSION = 4
 ALLOWED_TAGS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "strong", "em", "b", "i", "br", "img", "figure", "figcaption"}
 BAD_IMG = re.compile(r"logo|icon|avatar|sprite|badge|pixel|1x1|spacer|placeholder|emoji|\.svg(\?|$)|/ads?/|doubleclick|gravatar", re.I)
 BAD_MEDIA = re.compile(r"\.(mp4|m3u8|flv|webm|mov|mp3)(\?|$)|/video/|hlsvod|/flv/", re.I)
@@ -242,19 +242,22 @@ def clean_paragraphs(text):
     return out
 
 def looks_like_the_story(paragraphs, title, summary):
-    """The extracted text must read like an article and must be the article the feed described."""
+    """The extracted text must read like an article and must be the article the feed described.
+    Rules (v4, 2026-11-09): a feed summary is often a teaser, so the match is measured against the title and the
+    summary together and passes at 30%; a short news note (60+ words) passes when it plainly is the summary's story."""
     words = [w for w in re.findall(r"[A-Za-z][A-Za-z'’-]{2,}", " ".join(paragraphs))]
-    if len(words) < 120:
-        return False, "too short"
+    text_words = set(w.lower() for w in words)
+    probe = set(w.lower() for w in re.findall(r"[A-Za-z][A-Za-z'’-]{3,}", (title or "") + " " + (summary or "")) if w.lower() not in STOP)
+    overlap = len(probe & text_words) / len(probe) if probe else 1.0
     long_pars = [p for p in paragraphs if len(p.split()) >= 15]
+    if len(words) < 120:
+        if len(words) >= 60 and long_pars and overlap >= 0.7:
+            return True, "ok (short note)"
+        return False, "too short"
     if len(long_pars) < 2:
         return False, "no real paragraphs"
-    text_words = set(w.lower() for w in words)
-    probe = set(w.lower() for w in re.findall(r"[A-Za-z][A-Za-z'’-]{3,}", summary or "") if w.lower() not in STOP)
-    if len(probe) >= 8:
-        overlap = len(probe & text_words) / len(probe)
-        if overlap < 0.45:
-            return False, f"does not match the feed's summary ({overlap:.0%})"
+    if len(probe) >= 8 and overlap < 0.30:
+        return False, f"does not match the feed's title and summary ({overlap:.0%})"
     return True, "ok"
 
 STOP = set("that with this from have were they their there which about after before while would could should these those been being into over under more most some such only also than then them when where what your will just like said says".split())
@@ -397,19 +400,31 @@ def article_text(rec):
         return None
     try:
         r = requests.get(url, headers={"User-Agent": UA, "Accept": "text/html"}, timeout=10, stream=True)
+        if r.status_code in (401, 403, 429, 451):
+            return {"kind": story_kind(url, title), "text": None, "why": "site refuses the reader"}
         if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
             return None
         html_text = r.raw.read(1_500_000, decode_content=True).decode(r.encoding or "utf-8", "ignore")
         kind = story_kind(url, title, html_text)
-        out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
-                                  include_comments=False, include_tables=False, favor_precision=True)
-        if not out:
-            return {"kind": kind, "text": None, "why": "nothing extracted"}
-        body_html, text = sanitize_article(out, url)
-        paragraphs = clean_paragraphs(text)
-        ok, why = looks_like_the_story(paragraphs, title, summary)
-        if ok and body_html.count("<img") > 3 + len(" ".join(paragraphs).split()) / 120:
-            ok, why = False, "looks like a listing page (too many pictures for its text)"
+        def attempt(precise):
+            out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
+                                      include_comments=False, include_tables=False,
+                                      favor_precision=precise, favor_recall=not precise)
+            if not out:
+                return None, None, None, (False, "nothing extracted")
+            bh, tx = sanitize_article(out, url)
+            pars = clean_paragraphs(tx)
+            res = looks_like_the_story(pars, title, summary)
+            n_words = len(" ".join(pars).split())
+            if res[0] and bh.count("<img") > max(12, n_words / 40):
+                res = (False, "looks like a listing page (too many pictures for its text)")
+            return bh, tx, pars, res
+        body_html, text, paragraphs, (ok, why) = attempt(True)
+        if not ok and why in ("nothing extracted", "too short", "no real paragraphs"):
+            # some layouts (PBS NewsHour among them) defeat the precise pass; the generous one finds the story
+            b2, t2, p2, (ok2, why2) = attempt(False)
+            if ok2:
+                body_html, text, paragraphs, ok, why = b2, t2, p2, ok2, why2
         if not ok:
             return {"kind": kind, "text": None, "why": why}
         # rebuild the html without the paragraphs we dropped
@@ -496,7 +511,8 @@ def main():
     results = {}
     quick = os.environ.get("QUICK", "").strip().lower() in ("1", "true", "yes")
     if quick:
-        os.environ.setdefault("OG_BUDGET", "40"); os.environ.setdefault("ARTICLE_BUDGET", "80")
+        if not os.environ.get("OG_BUDGET"): os.environ["OG_BUDGET"] = "40"
+        if not os.environ.get("ARTICLE_BUDGET"): os.environ["ARTICLE_BUDGET"] = "80"
         log("quick gathering")
     with cf.ThreadPoolExecutor(max_workers=32) as ex:
         for sid, items, status, secs, cache in ex.map(lambda s: fetch_source(s, store["http"]), feeds):
@@ -545,7 +561,7 @@ def main():
         store["items"].pop(iid, None); store["images"].pop(iid, None)
 
     # 4. photos for stories that came without one (newest first, bounded)
-    budget = int(os.environ.get("OG_BUDGET", "80"))
+    budget = int(os.environ.get("OG_BUDGET") or "80")
     want = [store["items"][i] for i in new_ids if not store["items"][i].get("image") and i not in store["images"]]
     want.sort(key=lambda r: r["published"], reverse=True)
     want = want[:budget]
@@ -559,15 +575,15 @@ def main():
 
     # 4b. full text for new stories (newest first, bounded); kept in the cache next to the store
     os.makedirs(ARTICLES_DIR, exist_ok=True)
-    abudget = int(os.environ.get("ARTICLE_BUDGET", "250"))
+    abudget = int(os.environ.get("ARTICLE_BUDGET") or "250")
     def _article_state(iid):
         ap = os.path.join(ARTICLES_DIR, iid + ".json")
         if not os.path.exists(ap):
             return 0                      # never fetched
         rec = load_json(ap, {})
-        if rec.get("v", 1) >= ARTICLE_VERSION or not rec.get("text"):
-            return 2                      # current, or known-unreadable: leave it
-        return 1                          # older text-only record: refresh when there is room
+        if rec.get("v", 1) >= ARTICLE_VERSION or rec.get("text"):
+            return 2                      # judged under the current rules, or already readable: leave it
+        return 1                          # rejected under older rules: try again when there is room
     cands = [v for v in store["items"].values() if by_id.get(v["source"], {}).get("fulltext", True)
              and dt.datetime.fromisoformat(v["published"]) >= NOW - dt.timedelta(days=PUBLISH_DAYS)]
     cands = [(v, _article_state(v["id"])) for v in cands]
@@ -589,6 +605,30 @@ def main():
                 else:
                     w = art.get("why", "no page"); whys[w] = whys.get(w, 0) + 1
         log(f"full text fetched for {len(want)} stories, passed the quality check: {got}; rejected: {whys}")
+    # the same opening text under different stories from one source is the site's furniture, not an article
+    openings = {}
+    for name in os.listdir(ARTICLES_DIR):
+        iid = name[:-5]
+        rec_ = store["items"].get(iid)
+        art_ = load_json(os.path.join(ARTICLES_DIR, name), {})
+        if rec_ and art_.get("text"):
+            key = (rec_["source"], re.sub(r"\W+", " ", art_["text"][:400].lower()).strip())
+            openings.setdefault(key, []).append(name)
+    dupes = 0
+    for (sid_, _), names in openings.items():
+        if len(names) > 1:
+            for name in names:
+                ap_ = os.path.join(ARTICLES_DIR, name)
+                art_ = load_json(ap_, {})
+                art_.update(text=None, html=None, images=[], why="same text as other stories (site furniture)")
+                with open(ap_, "w", encoding="utf-8") as f:
+                    json.dump(art_, f, ensure_ascii=False)
+                blob_ = os.path.join(os.path.dirname(STORE_PATH), "blobs", name[:-5] + ".bin")
+                if os.path.exists(blob_):
+                    os.remove(blob_)
+                dupes += 1
+    if dupes:
+        log(f"site furniture caught: {dupes} stories share their text with another")
     for name in os.listdir(ARTICLES_DIR):
         if name[:-5] not in store["items"]:
             os.remove(os.path.join(ARTICLES_DIR, name))
@@ -675,6 +715,16 @@ def main():
             os.remove(os.path.join(blobs, name))
     out_items = [{k: v for k, v in r.items() if k in ("id", "url", "title", "summary", "image", "published", "source", "section", "tags", "place", "also", "reader", "kind")}
                  for r in items]
+    reader_stats = {}
+    for r in items:
+        ap_ = os.path.join(ARTICLES_DIR, r["id"] + ".json")
+        if not os.path.exists(ap_):
+            continue
+        art_ = load_json(ap_, {})
+        st_ = reader_stats.setdefault(r["source"], {"tried": 0, "ok": 0, "refused": 0})
+        st_["tried"] += 1
+        st_["ok"] += bool(art_.get("text"))
+        st_["refused"] += art_.get("why") == "site refuses the reader"
     bundle = {
         "generated": NOW.isoformat(),
         "items": out_items,
@@ -683,6 +733,7 @@ def main():
         "feedback": feedback,
         "sources": [{"id": s["id"], "name": s["name"], "home": s.get("home"), "section": s["section"], "weight": s.get("weight", 1.0),
                      "publication": s.get("publication"), "pubname": s.get("pubname"), "paywalled": bool(s.get("paywalled")),
+                     "fulltext": s.get("fulltext", True), "reader": reader_stats.get(s["id"]),
                      "health": store["health"].get(s["id"], {}).get("last_status")} for s in feeds],
         "stats": {"stories": len(out_items), "new": len(new_ids), "sources_ok": sum(1 for s in feeds if (results.get(s["id"]) or (None, ""))[1].startswith(("ok", "unchanged")))},
     }

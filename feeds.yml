@@ -2,7 +2,7 @@
 # Fields: id, name, url (RSS/Atom), home, section, tags (list), weight (0.5–1.5, default 1), place (optional),
 #         fulltext (default true; false = never fetch this source's story text for the in-app reader)
 # Sources for private places live in private.enc (see README) and are merged in at build time.
-# Checked live 2026-11-07.
+# Checked live 2026-11-07. No religious or religion-affiliated outlets (Captain's word 2026-11-09).
 sources:
   - {id: bbc-world, name: BBC News — World, url: "https://feeds.bbci.co.uk/news/world/rss.xml", home: "https://www.bbc.com/news/world", section: world, tags: [world], weight: 1.4}
   - {id: bbc-top, name: BBC News, url: "https://feeds.bbci.co.uk/news/rss.xml", home: "https://www.bbc.com/news", section: world, tags: [world], weight: 1.3}
@@ -15,7 +15,6 @@ sources:
   - {id: france24, name: France 24, url: "https://www.france24.com/en/rss", home: "https://www.france24.com/en/", section: world, tags: [world, europe], weight: 1.2}
   - {id: propublica, name: ProPublica, url: "https://feeds.propublica.org/propublica/main", home: "https://www.propublica.org", section: world, tags: [us, investigations], weight: 1.4}
   - {id: conversation, name: The Conversation, url: "https://theconversation.com/us/articles.atom", home: "https://theconversation.com/us", section: ideas, tags: [ideas, science], weight: 1.3}
-  - {id: cs-monitor, name: Christian Science Monitor, url: "https://rss.csmonitor.com/feeds/all", home: "https://www.csmonitor.com", section: world, tags: [world, us], weight: 1.2}
   - {id: euronews, name: Euronews, url: "https://www.euronews.com/rss", home: "https://www.euronews.com", section: world, tags: [europe], weight: 0.7}
   - {id: ars, name: Ars Technica, url: "https://feeds.arstechnica.com/arstechnica/index", home: "https://arstechnica.com", section: science, tags: [tech, science], weight: 1.4}
   - {id: quanta, name: Quanta Magazine, url: "https://api.quantamagazine.org/feed/", home: "https://www.quantamagazine.org", section: science, tags: [science, math], weight: 1.4}

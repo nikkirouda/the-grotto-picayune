@@ -17,7 +17,7 @@ let bundle = null;          // {items, weather, prefs, sources, generated}
 let prefs = null;           // effective preferences (bundle prefs + local edits)
 let votes = LS.get('votes', {});        // id -> {v:+1|-1, t:ms, s:source, tags:[...], tok:[...]}
 let read = LS.get('read', {});          // id -> ms
-let opts = Object.assign({ images: true, hideRead: true, showHidden: false, compact: false, hideVideo: false, sort: 'score' }, LS.get('opts', {}));
+let opts = Object.assign({ images: true, hideRead: true, showHidden: false, compact: false, hideVideo: false, paperOnly: false, sort: 'score' }, LS.get('opts', {}));
 if (!opts.v2) { opts.hideRead = true; opts.v2 = true; LS.set('opts', opts); }   // Captain's word 2026-11-08: a read piece leaves the list
 let route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
 let query = '';
@@ -99,7 +99,8 @@ function score(it) {
   const recency = Math.exp(-ageH / 24) + 0.03;
   const boosts = boostRe ? (it._text.match(boostRe) || []).length : 0;
   const video = it.kind === 'video' ? 0.2 : 1;      // written pieces first; video, audio and galleries far down
-  const base = (src.weight || 1) * (1 + 0.2 * Math.min(boosts, 3)) * recency * video;
+  const inPaper = it.reader ? 1.25 : (src.paywalled ? 1 : 0.8);   // stories that open in the paper rank a little higher
+  const base = (src.weight || 1) * (1 + 0.2 * Math.min(boosts, 3)) * recency * video * inPaper;
   const L = learned(it);
   return { value: base * Math.pow(2, L.total / 3), base, boosts, L, ageH };
 }
@@ -107,6 +108,7 @@ function whyText(sc, it) {
   const bits = [];
   const src = sourceById[it.source] || {};
   if (it.kind === 'video') bits.push('video/audio ×0.2');
+  if (!it.reader && !src.paywalled) bits.push('opens at source ×0.8');
   if (src.weight && src.weight !== 1) bits.push(`source ×${src.weight}`);
   if (sc.boosts) bits.push(`${sc.boosts} boosted word${sc.boosts > 1 ? 's' : ''}`);
   if (sc.L.s) bits.push(`${sc.L.s > 0 ? '+' : ''}${sc.L.s.toFixed(1)} source`);
@@ -204,6 +206,7 @@ function visibleItems() {
     if (!opts.showHidden && sc.L.total <= hideAt && !votes[it.id]) { hidden++; continue; }
     if (opts.hideRead && read[it.id] && !query) continue;      // read pieces leave the lists; search still finds them
     if (opts.hideVideo && it.kind === 'video') continue;
+    if (opts.paperOnly && !it.reader && !srcInfo.paywalled && !query) continue;
     it._sc = sc;
     out.push(it);
   }
@@ -282,6 +285,7 @@ function card(it, lead) {
   $$('a', n).forEach(a => a.addEventListener('click', () => markRead(it, n)));
   if (it.kind === 'video') { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· video/audio'; $('.meta', n).appendChild(b); }
   if (src.paywalled) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· subscriber, opens at the source'; $('.meta', n).appendChild(b); }
+  else if (!it.reader) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = src.reader && src.reader.tried >= 3 && src.reader.refused / src.reader.tried > 0.5 ? '· opens at source (site blocks readers)' : '· opens at source'; $('.meta', n).appendChild(b); }
   if (it.reader) {
     $('.rd', n).textContent = '· in the paper';
     for (const a of [$('.title', n), $('.thumb', n)]) a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); openReader(it, n); });
@@ -597,7 +601,7 @@ function addTerm(key, inputEl) {
   savePrefsLocal(patch); inputEl.value = ''; fillTopics(); buildList();
 }
 function fillSettings() {
-  $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact; $('#optHideVideo').checked = opts.hideVideo;
+  $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact; $('#optHideVideo').checked = opts.hideVideo; $('#optPaperOnly').checked = opts.paperOnly;
   $('#blockedTerms').value = (prefs.blocked_terms || []).join('\n'); $('#blockedCount').textContent = `(${(prefs.blocked_terms || []).length})`;
   $('#boostTerms').value = (prefs.boosted_terms || []).join('\n'); $('#boostCount').textContent = `(${(prefs.boosted_terms || []).length})`;
   $('#hideThreshold').value = prefs.hide_threshold ?? -2;
@@ -607,7 +611,10 @@ function fillSettings() {
   const secName = id => ((prefs.sections || []).find(x => x.id === id) || { name: id }).name;
   $('#sourceList').innerHTML = Object.keys(bySec).sort((a, b) => secName(a).localeCompare(secName(b))).map(sec => `<div class="muted small" style="margin-top:8px"><b>${esc(secName(sec))}</b></div>` + bySec[sec].map(s => {
     const bad = s.health && !/^ok|^unchanged/.test(s.health);
-    return `<label><input type="checkbox" data-src="${esc(s.id)}" ${muted.has(s.id) ? '' : 'checked'}> ${esc(s.name)}<span class="st ${bad ? 'bad' : ''}">${esc(s.health || '')}</span></label>`;
+    const rd = s.paywalled ? 'subscriber' : s.fulltext === false ? 'headlines only' : !s.reader || !s.reader.tried ? '' :
+      (s.reader.refused / s.reader.tried > 0.5 ? 'blocks readers' : `${Math.round(100 * s.reader.ok / s.reader.tried)}% in the paper`);
+    const rdBad = rd === 'blocks readers' || /^([0-9]|[1-3][0-9])% /.test(rd);
+    return `<label><input type="checkbox" data-src="${esc(s.id)}" ${muted.has(s.id) ? '' : 'checked'}> ${esc(s.name)}<span class="st ${bad || rdBad ? 'bad' : ''}">${esc(bad ? s.health : rd || s.health || '')}</span></label>`;
   }).join('')).join('');
   $('#sourceCount').textContent = `(${(bundle.sources || []).length}, ${muted.size} muted)`;
   $$('#sourceList input').forEach(cb => cb.onchange = () => {
@@ -642,7 +649,7 @@ function wireSettings() {
   $('#addBoost').onsubmit = e => { e.preventDefault(); addTerm('boosted_terms', $('#addBoost input')); };
   $('#addBlock').onsubmit = e => { e.preventDefault(); addTerm('blocked_terms', $('#addBlock input')); };
   const opt = (id, key, after) => $(id).onchange = e => { opts[key] = e.target.checked; LS.set('opts', opts); document.body.classList.toggle('compact', opts.compact); buildList(); };
-  opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact'); opt('#optHideVideo', 'hideVideo');
+  opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact'); opt('#optHideVideo', 'hideVideo'); opt('#optPaperOnly', 'paperOnly');
   const lines = v => v.split('\n').map(x => x.trim()).filter(Boolean);
   $('#blockedTerms').onchange = e => { savePrefsLocal({ blocked_terms: lines(e.target.value) }); fillSettings(); buildList(); };
   $('#boostTerms').onchange = e => { savePrefsLocal({ boosted_terms: lines(e.target.value) }); fillSettings(); buildList(); };

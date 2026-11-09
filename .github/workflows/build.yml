@@ -11,6 +11,10 @@ on:
         description: "Quick gathering: fewer photo and article look-ups, so the edition lands in about two minutes"
         type: boolean
         default: false
+      full:
+        description: "Full gathering: try every story in the window for the reader (as the dawn edition does)"
+        type: boolean
+        default: false
   push:
     branches: [main]
 
@@ -47,6 +51,8 @@ jobs:
         env:
           NEWS_PASSPHRASE: ${{ secrets.NEWS_PASSPHRASE }}
           QUICK: ${{ inputs.quick }}
+          ARTICLE_BUDGET: ${{ (github.event_name == 'schedule' || inputs.full) && '4000' || '' }}
+          OG_BUDGET: ${{ (github.event_name == 'schedule' || inputs.full) && '400' || '' }}
         run: python3 build/fetch.py
       - name: Save the archive for the next run
         if: always()
