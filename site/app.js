@@ -432,21 +432,21 @@ async function gather(manual) {
     if (await pullNewer()) return;                       // a newer edition was already waiting
     const canAsk = !!LS.get('token', '') && !!(LS.get('repo', guessRepo()));
     if (!canAsk) {
-      if (manual) flash(`Up to date with the latest edition, gathered ${ago(manifest.generated)}. New editions are gathered when the owner opens the paper.`, 8000);
+      if (manual) flash(`Up to date with the latest edition, gathered ${ago(manifest.generated)}. A full edition is gathered every morning before dawn; the owner's devices can gather one any time.`, 8000);
       return;
     }
     if (!manual && buildAgeMin() < 15) return;            // fresh enough; nothing to do on open
     if (manual && buildAgeMin() < 2) { flash('This edition is only minutes old.'); return; }
     gathering = true; btn.classList.add('busy');
     const running = await gh('actions/runs?per_page=5').then(d => (d.workflow_runs || []).some(r => r.status === 'in_progress' || r.status === 'queued')).catch(() => false);
-    if (!running) await gh('actions/workflows/build.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
-    setStatus('Gathering fresh stories… usually two to three minutes. The current edition stays readable meanwhile.');
+    if (!running) await gh('actions/workflows/build.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { quick: 'true' } }) });
+    setStatus('Gathering fresh stories… usually about two minutes. The current edition stays readable meanwhile.');
     const started = Date.now();
     clearInterval(pollTimer);
     pollTimer = setInterval(async () => {
       try { if (await pullNewer()) stopGather(); } catch {}
       if (Date.now() - started > 8 * 60e3) { stopGather(); flash('The gathering is taking longer than usual; tap ↻ in a few minutes.'); }
-    }, 20000);
+    }, 12000);
   } catch (e) { stopGather(); if (manual) flash(`Could not start a gathering (${e.message}).`); }
 }
 function stopGather() { gathering = false; clearInterval(pollTimer); $('#refreshBtn').classList.remove('busy'); if ($('#status').textContent.startsWith('Gathering')) setStatus(''); }

@@ -44,6 +44,8 @@ site/ (index.html, app.js) ──► GitHub Pages
   else and never republished. A source can opt out with `fulltext: false` in `feeds.yml`.
 - **Ranking** happens in the browser, one method, in `site/app.js`:
   `score = source weight × (1 + 0.2 × boosted-word hits) × e^(−age/24h) × 2^(learned/3)`
+  Source weights run from 1.4 (BBC, NPR, the Guardian, PBS, ProPublica, Quanta, Science News, Ars)
+  through 1.0 (most outlets) down to 0.5 (forums); they are set in `feeds.yml`.
   where `learned` is what your 👍/👎 taught it about the story's source, topics and headline words
   (each part clipped to ±3). A story at or below the hide threshold (default −2) is hidden. Blocked
   words remove a story outright. Each card's grey note says why it ranks where it does.
@@ -66,12 +68,12 @@ site/ (index.html, app.js) ──► GitHub Pages
 
 ## Everyday
 
-- **Gathering happens on demand, never on a clock.** On a device holding the owner's key, opening the
-  paper (or bringing it back to the front after a while) shows the last edition at once and, if that
-  edition is more than fifteen minutes old, asks GitHub to gather a fresh one; it slides in two to three
-  minutes later with a note of how many stories are new. ↻ does the same on request. Devices without
-  the key read the latest edition and ↻ pulls in a newer one if there is one. If nobody opens the paper
-  for a week, GitHub drops the build cache and the next gathering starts the archive afresh.
+- **Gathering.** A full edition is gathered once a day before dawn (3 AM Eastern in winter). On a device
+  holding the owner's key, opening the paper (or bringing it back to the front after a while) shows the
+  last edition at once and, if it is more than fifteen minutes old, asks GitHub for a quick gathering
+  (fewer photo and article look-ups) that slides in about two minutes later with a note of how many
+  stories are new. ↻ does the same on request. Devices without the key read the latest edition and ↻
+  pulls in a newer one if there is one.
 - A story you have opened leaves the lists (search still finds it); untick *Hide stories I've opened* in
   Settings to see them greyed instead.
 - **For you** ranks everything; **Latest** is chronological; places and topics have their own tabs.

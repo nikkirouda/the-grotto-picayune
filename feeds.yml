@@ -4,38 +4,38 @@
 # Sources for private places live in private.enc (see README) and are merged in at build time.
 # Checked live 2026-11-07.
 sources:
-  - {id: bbc-world, name: BBC News — World, url: "https://feeds.bbci.co.uk/news/world/rss.xml", home: "https://www.bbc.com/news/world", section: world, tags: [world], weight: 1.2}
-  - {id: bbc-top, name: BBC News, url: "https://feeds.bbci.co.uk/news/rss.xml", home: "https://www.bbc.com/news", section: world, tags: [world]}
-  - {id: npr-news, name: NPR News, url: "https://feeds.npr.org/1001/rss.xml", home: "https://www.npr.org", section: world, tags: [world, us], weight: 1.2}
-  - {id: npr-world, name: NPR World, url: "https://feeds.npr.org/1004/rss.xml", home: "https://www.npr.org/sections/world/", section: world, tags: [world]}
-  - {id: guardian-world, name: The Guardian — World, url: "https://www.theguardian.com/world/rss", home: "https://www.theguardian.com/world", section: world, tags: [world]}
-  - {id: dw, name: Deutsche Welle, url: "https://rss.dw.com/rdf/rss-en-all", home: "https://www.dw.com/en/", section: world, tags: [world, europe]}
-  - {id: pbs-newshour, name: PBS NewsHour, url: "https://www.pbs.org/newshour/feeds/rss/headlines", home: "https://www.pbs.org/newshour", section: world, tags: [world, us]}
-  - {id: aljazeera, name: Al Jazeera English, url: "https://www.aljazeera.com/xml/rss/all.xml", home: "https://www.aljazeera.com", section: world, tags: [world], weight: 0.8}
-  - {id: france24, name: France 24, url: "https://www.france24.com/en/rss", home: "https://www.france24.com/en/", section: world, tags: [world, europe], weight: 0.9}
-  - {id: propublica, name: ProPublica, url: "https://feeds.propublica.org/propublica/main", home: "https://www.propublica.org", section: world, tags: [us, investigations]}
-  - {id: conversation, name: The Conversation, url: "https://theconversation.com/us/articles.atom", home: "https://theconversation.com/us", section: ideas, tags: [ideas, science]}
-  - {id: cs-monitor, name: Christian Science Monitor, url: "https://rss.csmonitor.com/feeds/all", home: "https://www.csmonitor.com", section: world, tags: [world, us], weight: 0.9}
-  - {id: euronews, name: Euronews, url: "https://www.euronews.com/rss", home: "https://www.euronews.com", section: world, tags: [europe], weight: 0.8}
-  - {id: ars, name: Ars Technica, url: "https://feeds.arstechnica.com/arstechnica/index", home: "https://arstechnica.com", section: science, tags: [tech, science], weight: 1.2}
-  - {id: quanta, name: Quanta Magazine, url: "https://api.quantamagazine.org/feed/", home: "https://www.quantamagazine.org", section: science, tags: [science, math], weight: 1.3}
-  - {id: nature, name: Nature, url: "https://www.nature.com/nature.rss", home: "https://www.nature.com/nature", section: science, tags: [science], weight: 0.9}
-  - {id: mit-tr, name: MIT Technology Review, url: "https://www.technologyreview.com/feed/", home: "https://www.technologyreview.com", section: science, tags: [tech, ai]}
-  - {id: science-news, name: Science News, url: "https://www.sciencenews.org/feed", home: "https://www.sciencenews.org", section: science, tags: [science], weight: 1.1}
+  - {id: bbc-world, name: BBC News — World, url: "https://feeds.bbci.co.uk/news/world/rss.xml", home: "https://www.bbc.com/news/world", section: world, tags: [world], weight: 1.4}
+  - {id: bbc-top, name: BBC News, url: "https://feeds.bbci.co.uk/news/rss.xml", home: "https://www.bbc.com/news", section: world, tags: [world], weight: 1.3}
+  - {id: npr-news, name: NPR News, url: "https://feeds.npr.org/1001/rss.xml", home: "https://www.npr.org", section: world, tags: [world, us], weight: 1.4}
+  - {id: npr-world, name: NPR World, url: "https://feeds.npr.org/1004/rss.xml", home: "https://www.npr.org/sections/world/", section: world, tags: [world], weight: 1.3}
+  - {id: guardian-world, name: The Guardian — World, url: "https://www.theguardian.com/world/rss", home: "https://www.theguardian.com/world", section: world, tags: [world], weight: 1.4}
+  - {id: dw, name: Deutsche Welle, url: "https://rss.dw.com/rdf/rss-en-all", home: "https://www.dw.com/en/", section: world, tags: [world, europe], weight: 1.3}
+  - {id: pbs-newshour, name: PBS NewsHour, url: "https://www.pbs.org/newshour/feeds/rss/headlines", home: "https://www.pbs.org/newshour", section: world, tags: [world, us], weight: 1.4}
+  - {id: aljazeera, name: Al Jazeera English, url: "https://www.aljazeera.com/xml/rss/all.xml", home: "https://www.aljazeera.com", section: world, tags: [world], weight: 0.7}
+  - {id: france24, name: France 24, url: "https://www.france24.com/en/rss", home: "https://www.france24.com/en/", section: world, tags: [world, europe], weight: 1.2}
+  - {id: propublica, name: ProPublica, url: "https://feeds.propublica.org/propublica/main", home: "https://www.propublica.org", section: world, tags: [us, investigations], weight: 1.4}
+  - {id: conversation, name: The Conversation, url: "https://theconversation.com/us/articles.atom", home: "https://theconversation.com/us", section: ideas, tags: [ideas, science], weight: 1.3}
+  - {id: cs-monitor, name: Christian Science Monitor, url: "https://rss.csmonitor.com/feeds/all", home: "https://www.csmonitor.com", section: world, tags: [world, us], weight: 1.2}
+  - {id: euronews, name: Euronews, url: "https://www.euronews.com/rss", home: "https://www.euronews.com", section: world, tags: [europe], weight: 0.7}
+  - {id: ars, name: Ars Technica, url: "https://feeds.arstechnica.com/arstechnica/index", home: "https://arstechnica.com", section: science, tags: [tech, science], weight: 1.4}
+  - {id: quanta, name: Quanta Magazine, url: "https://api.quantamagazine.org/feed/", home: "https://www.quantamagazine.org", section: science, tags: [science, math], weight: 1.4}
+  - {id: nature, name: Nature, url: "https://www.nature.com/nature.rss", home: "https://www.nature.com/nature", section: science, tags: [science], weight: 1.3}
+  - {id: mit-tr, name: MIT Technology Review, url: "https://www.technologyreview.com/feed/", home: "https://www.technologyreview.com", section: science, tags: [tech, ai], weight: 1.3}
+  - {id: science-news, name: Science News, url: "https://www.sciencenews.org/feed", home: "https://www.sciencenews.org", section: science, tags: [science], weight: 1.4}
   - {id: phys-org, name: Phys.org, url: "https://phys.org/rss-feed/", home: "https://phys.org", section: science, tags: [science], weight: 0.7}
   - {id: nasa, name: NASA, url: "https://www.nasa.gov/feed/", home: "https://www.nasa.gov", section: science, tags: [science, space]}
   - {id: verge, name: The Verge, url: "https://www.theverge.com/rss/index.xml", home: "https://www.theverge.com", section: science, tags: [tech], weight: 0.8}
   - {id: simonw, name: Simon Willison, url: "https://simonwillison.net/atom/everything/", home: "https://simonwillison.net", section: science, tags: [ai, tech], weight: 1.1}
-  - {id: sciam, name: Scientific American, url: "http://rss.sciam.com/ScientificAmerican-Global", home: "https://www.scientificamerican.com", section: science, tags: [science]}
-  - {id: smithsonian, name: Smithsonian Magazine, url: "https://www.smithsonianmag.com/rss/latest_articles/", home: "https://www.smithsonianmag.com", section: ideas, tags: [history, science], weight: 1.1}
-  - {id: atlas-obscura, name: Atlas Obscura, url: "https://www.atlasobscura.com/feeds/latest", home: "https://www.atlasobscura.com", section: travel, tags: [travel, history], weight: 1.1}
-  - {id: aeon, name: Aeon, url: "https://aeon.co/feed.rss", home: "https://aeon.co", section: ideas, tags: [ideas]}
+  - {id: sciam, name: Scientific American, url: "http://rss.sciam.com/ScientificAmerican-Global", home: "https://www.scientificamerican.com", section: science, tags: [science], weight: 1.2}
+  - {id: smithsonian, name: Smithsonian Magazine, url: "https://www.smithsonianmag.com/rss/latest_articles/", home: "https://www.smithsonianmag.com", section: ideas, tags: [history, science], weight: 1.3}
+  - {id: atlas-obscura, name: Atlas Obscura, url: "https://www.atlasobscura.com/feeds/latest", home: "https://www.atlasobscura.com", section: travel, tags: [travel, history], weight: 1.3}
+  - {id: aeon, name: Aeon, url: "https://aeon.co/feed.rss", home: "https://aeon.co", section: ideas, tags: [ideas], weight: 1.3}
   - {id: lithub, name: Literary Hub, url: "https://lithub.com/feed/", home: "https://lithub.com", section: ideas, tags: [books], weight: 0.8}
-  - {id: pdr, name: The Public Domain Review, url: "https://publicdomainreview.org/rss.xml", home: "https://publicdomainreview.org", section: ideas, tags: [history, books], weight: 1.1}
-  - {id: nautilus, name: Nautilus, url: "https://nautil.us/feed/", home: "https://nautil.us", section: ideas, tags: [science, ideas]}
-  - {id: ieee-spectrum, name: IEEE Spectrum, url: "https://spectrum.ieee.org/feeds/feed.rss", home: "https://spectrum.ieee.org", section: science, tags: [tech, ai], weight: 0.9}
+  - {id: pdr, name: The Public Domain Review, url: "https://publicdomainreview.org/rss.xml", home: "https://publicdomainreview.org", section: ideas, tags: [history, books], weight: 1.3}
+  - {id: nautilus, name: Nautilus, url: "https://nautil.us/feed/", home: "https://nautil.us", section: ideas, tags: [science, ideas], weight: 1.2}
+  - {id: ieee-spectrum, name: IEEE Spectrum, url: "https://spectrum.ieee.org/feeds/feed.rss", home: "https://spectrum.ieee.org", section: science, tags: [tech, ai], weight: 1.2}
   - {id: arxiv-ai-blog, name: The Gradient, url: "https://thegradient.pub/rss/", home: "https://thegradient.pub", section: science, tags: [ai], weight: 0.9}
-  - {id: ri-current, name: Rhode Island Current, url: "https://rhodeislandcurrent.com/feed/", home: "https://rhodeislandcurrent.com", section: local-ri, tags: [rhode-island], weight: 1.3, place: providence}
+  - {id: ri-current, name: Rhode Island Current, url: "https://rhodeislandcurrent.com/feed/", home: "https://rhodeislandcurrent.com", section: local-ri, tags: [rhode-island], place: providence, weight: 1.2}
   - {id: ecori, name: ecoRI News, url: "https://ecori.org/feed/", home: "https://ecori.org", section: local-ri, tags: [rhode-island, environment], weight: 1.2, place: providence}
   - {id: wpri, name: WPRI 12, url: "https://www.wpri.com/feed/", home: "https://www.wpri.com", section: local-ri, tags: [rhode-island], place: providence}
   - {id: publics-radio, name: The Public's Radio, url: "https://thepublicsradio.org/feed/", home: "https://thepublicsradio.org", section: local-ri, tags: [rhode-island], weight: 1.2, place: providence}
@@ -43,17 +43,17 @@ sources:
   - {id: motif, name: Motif Magazine, url: "https://motifri.com/feed/", home: "https://motifri.com", section: local-ri, tags: [rhode-island, arts], weight: 0.8, place: providence}
   - {id: pbn, name: Providence Business News, url: "https://pbn.com/feed/", home: "https://pbn.com", section: local-ri, tags: [rhode-island], weight: 0.7, place: providence}
   - {id: pvd-eater, name: Eater Boston, url: "https://boston.eater.com/rss/index.xml", home: "https://boston.eater.com", section: beer-food, tags: [food, boston], weight: 0.9, place: boston}
-  - {id: wbur, name: WBUR, url: "https://rss.wbur.org/wbur/rss", home: "https://www.wbur.org", section: local-ne, tags: [boston, new-england], weight: 1.2, place: boston}
-  - {id: gbh, name: GBH News, url: "https://www.wgbh.org/news.rss", home: "https://www.wgbh.org/news", section: local-ne, tags: [boston, new-england], place: boston}
-  - {id: boston-com, name: Boston.com, url: "https://www.boston.com/feed/", home: "https://www.boston.com", section: local-ne, tags: [boston], weight: 0.8, place: boston}
-  - {id: universalhub, name: Universal Hub, url: "https://www.universalhub.com/uhub.xml", home: "https://www.universalhub.com", section: local-ne, tags: [boston], weight: 0.8, place: boston}
+  - {id: wbur, name: WBUR, url: "https://rss.wbur.org/wbur/rss", home: "https://www.wbur.org", section: local-ne, tags: [boston, new-england], place: boston, weight: 1.2}
+  - {id: gbh, name: GBH News, url: "https://www.wgbh.org/news.rss", home: "https://www.wgbh.org/news", section: local-ne, tags: [boston, new-england], place: boston, weight: 1.2}
+  - {id: boston-com, name: Boston.com, url: "https://www.boston.com/feed/", home: "https://www.boston.com", section: local-ne, tags: [boston], place: boston, weight: 0.8}
+  - {id: universalhub, name: Universal Hub, url: "https://www.universalhub.com/uhub.xml", home: "https://www.universalhub.com", section: local-ne, tags: [boston], place: boston, weight: 0.8}
   - {id: nehs, name: New England Historical Society, url: "https://newenglandhistoricalsociety.com/feed/", home: "https://newenglandhistoricalsociety.com", section: local-ne, tags: [new-england, history], weight: 1.1, place: boston}
   - {id: yankee, name: Yankee Magazine, url: "https://newengland.com/feed/", home: "https://newengland.com", section: local-ne, tags: [new-england, travel], place: boston}
   - {id: nhpr, name: New Hampshire Public Radio, url: "https://www.nhpr.org/news.rss", home: "https://www.nhpr.org", section: local-ne, tags: [new-england], weight: 0.7}
   - {id: vtdigger, name: VTDigger, url: "https://vtdigger.org/feed/", home: "https://vtdigger.org", section: local-ne, tags: [new-england], weight: 0.7}
   - {id: ct-mirror, name: CT Mirror, url: "https://ctmirror.org/feed/", home: "https://ctmirror.org", section: local-ne, tags: [new-england], weight: 0.7}
   - {id: maine-monitor, name: The Maine Monitor, url: "https://themainemonitor.org/feed/", home: "https://themainemonitor.org", section: local-ne, tags: [new-england], weight: 0.7}
-  - {id: fine-gardening, name: Fine Gardening, url: "https://www.finegardening.com/feed", home: "https://www.finegardening.com", section: garden, tags: [garden], weight: 1.1}
+  - {id: fine-gardening, name: Fine Gardening, url: "https://www.finegardening.com/feed", home: "https://www.finegardening.com", section: garden, tags: [garden], weight: 1.2}
   - {id: garden-rant, name: Garden Rant, url: "https://gardenrant.com/feed", home: "https://gardenrant.com", section: garden, tags: [garden]}
   - {id: awaytogarden, name: A Way to Garden, url: "https://awaytogarden.com/feed/", home: "https://awaytogarden.com", section: garden, tags: [garden], weight: 1.2}
   - {id: gardenista, name: Gardenista, url: "https://www.gardenista.com/feed/", home: "https://www.gardenista.com", section: garden, tags: [garden], weight: 0.9}
@@ -62,13 +62,13 @@ sources:
   - {id: thisoldhouse, name: This Old House, url: "https://www.thisoldhouse.com/feed", home: "https://www.thisoldhouse.com", section: house, tags: [old-house, diy]}
   - {id: craftsman-blog, name: The Craftsman Blog, url: "https://thecraftsmanblog.com/feed/", home: "https://thecraftsmanblog.com", section: house, tags: [old-house, diy], weight: 1.2}
   - {id: circa, name: Circa Old Houses, url: "https://circaoldhouses.com/feed/", home: "https://circaoldhouses.com", section: house, tags: [old-house], weight: 0.9}
-  - {id: family-handyman, name: Family Handyman, url: "https://www.familyhandyman.com/feed/", home: "https://www.familyhandyman.com", section: house, tags: [diy], weight: 0.7}
-  - {id: bat, name: Bring a Trailer, url: "https://bringatrailer.com/feed/", home: "https://bringatrailer.com", section: cars, tags: [cars, vintage], weight: 0.9}
-  - {id: hagerty, name: Hagerty Media, url: "https://www.hagerty.com/media/feed/", home: "https://www.hagerty.com/media", section: cars, tags: [cars, vintage], weight: 1.1}
-  - {id: the-drive, name: The Drive, url: "https://www.thedrive.com/feed", home: "https://www.thedrive.com", section: cars, tags: [cars], weight: 0.7}
+  - {id: family-handyman, name: Family Handyman, url: "https://www.familyhandyman.com/feed/", home: "https://www.familyhandyman.com", section: house, tags: [diy], weight: 0.8}
+  - {id: bat, name: Bring a Trailer, url: "https://bringatrailer.com/feed/", home: "https://bringatrailer.com", section: cars, tags: [cars, vintage], weight: 0.8}
+  - {id: hagerty, name: Hagerty Media, url: "https://www.hagerty.com/media/feed/", home: "https://www.hagerty.com/media", section: cars, tags: [cars, vintage], weight: 1.2}
+  - {id: the-drive, name: The Drive, url: "https://www.thedrive.com/feed", home: "https://www.thedrive.com", section: cars, tags: [cars], weight: 0.8}
   - {id: silodrome, name: Silodrome, url: "https://silodrome.com/feed/", home: "https://silodrome.com", section: cars, tags: [cars, vintage], weight: 0.9}
-  - {id: espn-nfl, name: ESPN NFL, url: "https://www.espn.com/espn/rss/nfl/news", home: "https://www.espn.com/nfl/", section: football, tags: [nfl], weight: 1.1}
-  - {id: pft, name: Pro Football Talk, url: "https://www.nbcsports.com/profootballtalk.rss", home: "https://profootballtalk.nbcsports.com", section: football, tags: [nfl], weight: 0.9}
+  - {id: espn-nfl, name: ESPN NFL, url: "https://www.espn.com/espn/rss/nfl/news", home: "https://www.espn.com/nfl/", section: football, tags: [nfl], weight: 1.2}
+  - {id: pft, name: Pro Football Talk, url: "https://www.nbcsports.com/profootballtalk.rss", home: "https://profootballtalk.nbcsports.com", section: football, tags: [nfl], weight: 0.8}
   - {id: patriots, name: Patriots.com, url: "https://www.patriots.com/rss/news", home: "https://www.patriots.com", section: football, tags: [nfl, patriots], weight: 0.8}
   - {id: gbh-beer, name: Good Beer Hunting, url: "https://www.goodbeerhunting.com/blog?format=rss", home: "https://www.goodbeerhunting.com", section: beer-food, tags: [beer], weight: 1.2}
   - {id: brewbound, name: Brewbound, url: "https://www.brewbound.com/feed/", home: "https://www.brewbound.com", section: beer-food, tags: [beer], weight: 0.8}
@@ -81,17 +81,17 @@ sources:
   - {id: dicebreaker, name: Dicebreaker, url: "https://www.dicebreaker.com/feed", home: "https://www.dicebreaker.com", section: games, tags: [tabletop, dnd], weight: 1.1}
   - {id: enworld, name: EN World, url: "https://www.enworld.org/ewr-porta/index.rss", home: "https://www.enworld.org", section: games, tags: [tabletop, dnd], weight: 1.2}
   - {id: wargamer, name: Wargamer, url: "https://www.wargamer.com/feed", home: "https://www.wargamer.com", section: games, tags: [tabletop, dnd], weight: 0.8}
-  - {id: rps, name: Rock Paper Shotgun, url: "https://www.rockpapershotgun.com/feed", home: "https://www.rockpapershotgun.com", section: games, tags: [videogames], weight: 0.7}
+  - {id: rps, name: Rock Paper Shotgun, url: "https://www.rockpapershotgun.com/feed", home: "https://www.rockpapershotgun.com", section: games, tags: [videogames], weight: 0.8}
   - {id: bgg, name: BoardGameGeek News, url: "https://boardgamegeek.com/rss/blog/1", home: "https://boardgamegeek.com/blog/1", section: games, tags: [tabletop], weight: 0.9}
   - {id: outside, name: Outside, url: "https://www.outsideonline.com/feed/", home: "https://www.outsideonline.com", section: ideas, tags: [fitness, outdoors], weight: 0.7}
   - {id: sbs, name: Stronger by Science, url: "https://www.strongerbyscience.com/feed/", home: "https://www.strongerbyscience.com", section: ideas, tags: [fitness], weight: 1.0}
-  - {id: bbc-science, name: BBC Science & Environment, url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", home: "https://www.bbc.com/news/science_and_environment", section: science, tags: [science, environment], weight: 1.1}
+  - {id: bbc-science, name: BBC Science & Environment, url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", home: "https://www.bbc.com/news/science_and_environment", section: science, tags: [science, environment], weight: 1.3}
   - {id: bbc-tech, name: BBC Technology, url: "https://feeds.bbci.co.uk/news/technology/rss.xml", home: "https://www.bbc.com/news/technology", section: science, tags: [tech], weight: 0.9}
-  - {id: guardian-science, name: The Guardian — Science, url: "https://www.theguardian.com/science/rss", home: "https://www.theguardian.com/science", section: science, tags: [science], weight: 1.0}
-  - {id: guardian-env, name: The Guardian — Environment, url: "https://www.theguardian.com/environment/rss", home: "https://www.theguardian.com/environment", section: science, tags: [environment], weight: 0.9}
-  - {id: guardian-books, name: The Guardian — Books, url: "https://www.theguardian.com/books/rss", home: "https://www.theguardian.com/books", section: ideas, tags: [books], weight: 0.9}
+  - {id: guardian-science, name: The Guardian — Science, url: "https://www.theguardian.com/science/rss", home: "https://www.theguardian.com/science", section: science, tags: [science], weight: 1.3}
+  - {id: guardian-env, name: The Guardian — Environment, url: "https://www.theguardian.com/environment/rss", home: "https://www.theguardian.com/environment", section: science, tags: [environment], weight: 1.2}
+  - {id: guardian-books, name: The Guardian — Books, url: "https://www.theguardian.com/books/rss", home: "https://www.theguardian.com/books", section: ideas, tags: [books], weight: 1.2}
   - {id: guardian-food, name: The Guardian — Food, url: "https://www.theguardian.com/food/rss", home: "https://www.theguardian.com/food", section: beer-food, tags: [food], weight: 0.8}
-  - {id: npr-science, name: NPR Science, url: "https://feeds.npr.org/1007/rss.xml", home: "https://www.npr.org/sections/science/", section: science, tags: [science], weight: 1.1}
+  - {id: npr-science, name: NPR Science, url: "https://feeds.npr.org/1007/rss.xml", home: "https://www.npr.org/sections/science/", section: science, tags: [science], weight: 1.3}
   - {id: eos, name: Eos (AGU), url: "https://eos.org/feed", home: "https://eos.org", section: science, tags: [science, environment], weight: 0.9}
   - {id: new-atlas, name: New Atlas, url: "https://newatlas.com/index.rss", home: "https://newatlas.com", section: science, tags: [tech, science], weight: 0.7}
   - {id: whatsupnewp, name: What's Up Newp, url: "https://whatsupnewp.com/feed/", home: "https://whatsupnewp.com", section: local-ri, tags: [rhode-island], weight: 0.9, place: providence}
@@ -103,44 +103,44 @@ sources:
   - {id: dmdavid, name: DM David, url: "https://dmdavid.com/feed/", home: "https://dmdavid.com", section: games, tags: [dnd, tabletop], weight: 1.0}
   - {id: sly-flourish, name: Sly Flourish, url: "https://slyflourish.com/index.xml", home: "https://slyflourish.com", section: games, tags: [dnd, tabletop], weight: 1.0}
   - {id: espn-fantasy, name: ESPN Fantasy, url: "https://www.espn.com/espn/rss/fantasy/news", home: "https://www.espn.com/fantasy/", section: fantasy, tags: [nfl, fantasy], weight: 1.0}
-  - {id: polygon, name: Polygon, url: "https://www.polygon.com/feed/", home: "https://www.polygon.com", section: games, tags: [videogames, tabletop], weight: 0.6}
+  - {id: polygon, name: Polygon, url: "https://www.polygon.com/feed/", home: "https://www.polygon.com", section: games, tags: [videogames, tabletop], weight: 0.8}
   # ---- Fun (Captain's picks, 2026-11-07) ----
-  - {id: xkcd,         name: xkcd,                        url: "https://xkcd.com/atom.xml", home: "https://xkcd.com", section: fun, tags: [fun, comics, science], weight: 1.3, fulltext: false}
+  - {id: xkcd,         name: xkcd,                        url: "https://xkcd.com/atom.xml", home: "https://xkcd.com", section: fun, tags: [fun, comics, science], fulltext: false, weight: 1.2}
   - {id: onion,        name: The Onion,                   url: "https://theonion.com/feed/", home: "https://theonion.com", section: fun, tags: [fun, satire], weight: 1.1}
   - {id: mcsweeneys,   name: "McSweeney's Internet Tendency", url: "https://www.mcsweeneys.net/rss", home: "https://www.mcsweeneys.net", section: fun, tags: [fun, satire, books], weight: 1.1}
   - {id: autopian,     name: The Autopian,                url: "https://www.theautopian.com/feed/", home: "https://www.theautopian.com", section: cars, tags: [cars, fun], weight: 1.2}
   # ---- Football, the whole league; and Fantasy Football on its own (Captain's word 2026-11-07) ----
-  - {id: cbs-nfl,      name: CBS Sports NFL,              url: "https://www.cbssports.com/rss/headlines/nfl/", home: "https://www.cbssports.com/nfl/", section: football, tags: [nfl], weight: 1.0}
-  - {id: yahoo-nfl,    name: Yahoo Sports NFL,            url: "https://sports.yahoo.com/nfl/rss/", home: "https://sports.yahoo.com/nfl/", section: football, tags: [nfl], weight: 0.9}
+  - {id: cbs-nfl,      name: CBS Sports NFL,              url: "https://www.cbssports.com/rss/headlines/nfl/", home: "https://www.cbssports.com/nfl/", section: football, tags: [nfl], weight: 1.2}
+  - {id: yahoo-nfl,    name: Yahoo Sports NFL,            url: "https://sports.yahoo.com/nfl/rss/", home: "https://sports.yahoo.com/nfl/", section: football, tags: [nfl], weight: 0.8}
   - {id: pfn,          name: Pro Football Network,        url: "https://www.profootballnetwork.com/feed/", home: "https://www.profootballnetwork.com", section: football, tags: [nfl], weight: 0.7}
-  - {id: yahoo-fantasy, name: Yahoo Fantasy Football,     url: "https://sports.yahoo.com/fantasy/rss/", home: "https://sports.yahoo.com/fantasy/football/", section: fantasy, tags: [fantasy, nfl], weight: 0.9}
+  - {id: yahoo-fantasy, name: Yahoo Fantasy Football,     url: "https://sports.yahoo.com/fantasy/rss/", home: "https://sports.yahoo.com/fantasy/football/", section: fantasy, tags: [fantasy, nfl], weight: 0.8}
   - {id: fftoday,      name: FFToday,                     url: "https://www.fftoday.com/rss/news.xml", home: "https://www.fftoday.com", section: fantasy, tags: [fantasy, nfl], weight: 0.9}
   - {id: 4for4,        name: 4for4,                       url: "https://www.4for4.com/rss.xml", home: "https://www.4for4.com", section: fantasy, tags: [fantasy, nfl], weight: 0.9}
   - {id: rotowire-nfl, name: RotoWire NFL,                url: "https://www.rotowire.com/rss/news.php?sport=NFL", home: "https://www.rotowire.com/football/", section: fantasy, tags: [fantasy, nfl], weight: 0.8}
   - {id: pff,          name: PFF,                         url: "https://www.pff.com/feed", home: "https://www.pff.com", section: fantasy, tags: [fantasy, nfl], weight: 0.8}
   - {id: fantasyfootballers, name: The Fantasy Footballers, url: "https://www.thefantasyfootballers.com/feed/", home: "https://www.thefantasyfootballers.com", section: fantasy, tags: [fantasy, nfl], weight: 0.8}
   - {id: dynastynerds, name: Dynasty Nerds,               url: "https://www.dynastynerds.com/feed/", home: "https://www.dynastynerds.com", section: fantasy, tags: [fantasy, nfl], weight: 0.7}
-  - {id: reddit-ff,    name: r/fantasyfootball,           url: "https://www.reddit.com/r/fantasyfootball/.rss", home: "https://www.reddit.com/r/fantasyfootball/", section: fantasy, tags: [fantasy, nfl], weight: 0.6, fulltext: false}
-  - {id: athletic-nfl, name: The Athletic — NFL,          url: "https://www.nytimes.com/athletic/rss/nfl/", home: "https://www.nytimes.com/athletic/nfl/", section: "pub:athletic", publication: athletic, pubname: "The Athletic", paywalled: true, fulltext: false, tags: [nfl]}
+  - {id: reddit-ff,    name: r/fantasyfootball,           url: "https://www.reddit.com/r/fantasyfootball/.rss", home: "https://www.reddit.com/r/fantasyfootball/", section: fantasy, tags: [fantasy, nfl], fulltext: false, weight: 0.5}
+  - {id: athletic-nfl, name: The Athletic — NFL,          url: "https://www.nytimes.com/athletic/rss/nfl/", home: "https://www.nytimes.com/athletic/nfl/", section: "pub:athletic", publication: athletic, pubname: "The Athletic", paywalled: true, fulltext: false, tags: [nfl], weight: 1.2}
   # ---- Subscriber publications (checked 2026-11-07). Free headline feeds; the stories themselves sit behind
   #      each publisher's paywall, so these show only on a device where the reader has ticked the publication
   #      in Settings, and every story opens at the source where their own sign-in applies. Never fetched in full.
-  - {id: nyt-home,     name: The New York Times,          url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", home: "https://www.nytimes.com", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [us, world]}
-  - {id: nyt-world,    name: NYT — World,                 url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", home: "https://www.nytimes.com/section/world", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [world]}
-  - {id: nyt-science,  name: NYT — Science,               url: "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml", home: "https://www.nytimes.com/section/science", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [science]}
-  - {id: nyt-tech,     name: NYT — Technology,            url: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", home: "https://www.nytimes.com/section/technology", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [tech]}
-  - {id: nyt-food,     name: NYT — Food,                  url: "https://rss.nytimes.com/services/xml/rss/nyt/DiningandWine.xml", home: "https://www.nytimes.com/section/food", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [food]}
-  - {id: nyt-travel,   name: NYT — Travel,                url: "https://rss.nytimes.com/services/xml/rss/nyt/Travel.xml", home: "https://www.nytimes.com/section/travel", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [travel]}
-  - {id: econ-week,    name: The Economist — The world this week, url: "https://www.economist.com/the-world-this-week/rss.xml", home: "https://www.economist.com/the-world-this-week", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [world], weight: 1.2}
-  - {id: econ-leaders, name: The Economist — Leaders,     url: "https://www.economist.com/leaders/rss.xml", home: "https://www.economist.com/leaders", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [world], weight: 1.2}
-  - {id: econ-briefing, name: The Economist — Briefing,   url: "https://www.economist.com/briefing/rss.xml", home: "https://www.economist.com/briefing", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [world], weight: 1.1}
-  - {id: econ-sci,     name: The Economist — Science & technology, url: "https://www.economist.com/science-and-technology/rss.xml", home: "https://www.economist.com/science-and-technology", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [science, tech], weight: 1.1}
-  - {id: econ-culture, name: The Economist — Culture,     url: "https://www.economist.com/culture/rss.xml", home: "https://www.economist.com/culture", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [books, arts]}
-  - {id: econ-europe,  name: The Economist — Europe,      url: "https://www.economist.com/europe/rss.xml", home: "https://www.economist.com/europe", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [europe]}
-  - {id: econ-us,      name: The Economist — United States, url: "https://www.economist.com/united-states/rss.xml", home: "https://www.economist.com/united-states", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [us]}
-  - {id: econ-britain, name: The Economist — Britain,     url: "https://www.economist.com/britain/rss.xml", home: "https://www.economist.com/britain", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [britain]}
-  - {id: ft-home,      name: Financial Times,             url: "https://www.ft.com/rss/home/international", home: "https://www.ft.com", section: "pub:ft", publication: ft, pubname: "Financial Times", paywalled: true, fulltext: false, tags: [world, business]}
-  - {id: wsj-world,    name: The Wall Street Journal — World, url: "https://feeds.content.dowjones.io/public/rss/RSSWorldNews", home: "https://www.wsj.com/news/world", section: "pub:wsj", publication: wsj, pubname: "The Wall Street Journal", paywalled: true, fulltext: false, tags: [world]}
-  - {id: wapo-world,   name: The Washington Post — World, url: "https://feeds.washingtonpost.com/rss/world", home: "https://www.washingtonpost.com/world/", section: "pub:wapo", publication: wapo, pubname: "The Washington Post", paywalled: true, fulltext: false, tags: [world]}
-  - {id: atlantic,     name: The Atlantic,                url: "https://www.theatlantic.com/feed/all/", home: "https://www.theatlantic.com", section: "pub:atlantic", publication: atlantic, pubname: "The Atlantic", paywalled: true, fulltext: false, tags: [ideas, us]}
-  - {id: newyorker,    name: The New Yorker,              url: "https://www.newyorker.com/feed/everything", home: "https://www.newyorker.com", section: "pub:newyorker", publication: newyorker, pubname: "The New Yorker", paywalled: true, fulltext: false, tags: [ideas, books, arts]}
+  - {id: nyt-home,     name: The New York Times,          url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", home: "https://www.nytimes.com", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [us, world], weight: 1.3}
+  - {id: nyt-world,    name: NYT — World,                 url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", home: "https://www.nytimes.com/section/world", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
+  - {id: nyt-science,  name: NYT — Science,               url: "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml", home: "https://www.nytimes.com/section/science", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [science], weight: 1.3}
+  - {id: nyt-tech,     name: NYT — Technology,            url: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", home: "https://www.nytimes.com/section/technology", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [tech], weight: 1.2}
+  - {id: nyt-food,     name: NYT — Food,                  url: "https://rss.nytimes.com/services/xml/rss/nyt/DiningandWine.xml", home: "https://www.nytimes.com/section/food", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [food], weight: 1.2}
+  - {id: nyt-travel,   name: NYT — Travel,                url: "https://rss.nytimes.com/services/xml/rss/nyt/Travel.xml", home: "https://www.nytimes.com/section/travel", section: "pub:nyt", publication: nyt, pubname: "The New York Times", paywalled: true, fulltext: false, tags: [travel], weight: 1.2}
+  - {id: econ-week,    name: The Economist — The world this week, url: "https://www.economist.com/the-world-this-week/rss.xml", home: "https://www.economist.com/the-world-this-week", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
+  - {id: econ-leaders, name: The Economist — Leaders,     url: "https://www.economist.com/leaders/rss.xml", home: "https://www.economist.com/leaders", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
+  - {id: econ-briefing, name: The Economist — Briefing,   url: "https://www.economist.com/briefing/rss.xml", home: "https://www.economist.com/briefing", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
+  - {id: econ-sci,     name: The Economist — Science & technology, url: "https://www.economist.com/science-and-technology/rss.xml", home: "https://www.economist.com/science-and-technology", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [science, tech], weight: 1.3}
+  - {id: econ-culture, name: The Economist — Culture,     url: "https://www.economist.com/culture/rss.xml", home: "https://www.economist.com/culture", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [books, arts], weight: 1.2}
+  - {id: econ-europe,  name: The Economist — Europe,      url: "https://www.economist.com/europe/rss.xml", home: "https://www.economist.com/europe", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [europe], weight: 1.2}
+  - {id: econ-us,      name: The Economist — United States, url: "https://www.economist.com/united-states/rss.xml", home: "https://www.economist.com/united-states", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [us], weight: 1.2}
+  - {id: econ-britain, name: The Economist — Britain,     url: "https://www.economist.com/britain/rss.xml", home: "https://www.economist.com/britain", section: "pub:economist", publication: economist, pubname: "The Economist", paywalled: true, fulltext: false, tags: [britain], weight: 1.2}
+  - {id: ft-home,      name: Financial Times,             url: "https://www.ft.com/rss/home/international", home: "https://www.ft.com", section: "pub:ft", publication: ft, pubname: "Financial Times", paywalled: true, fulltext: false, tags: [world, business], weight: 1.3}
+  - {id: wsj-world,    name: The Wall Street Journal — World, url: "https://feeds.content.dowjones.io/public/rss/RSSWorldNews", home: "https://www.wsj.com/news/world", section: "pub:wsj", publication: wsj, pubname: "The Wall Street Journal", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
+  - {id: wapo-world,   name: The Washington Post — World, url: "https://feeds.washingtonpost.com/rss/world", home: "https://www.washingtonpost.com/world/", section: "pub:wapo", publication: wapo, pubname: "The Washington Post", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
+  - {id: atlantic,     name: The Atlantic,                url: "https://www.theatlantic.com/feed/all/", home: "https://www.theatlantic.com", section: "pub:atlantic", publication: atlantic, pubname: "The Atlantic", paywalled: true, fulltext: false, tags: [ideas, us], weight: 1.3}
+  - {id: newyorker,    name: The New Yorker,              url: "https://www.newyorker.com/feed/everything", home: "https://www.newyorker.com", section: "pub:newyorker", publication: newyorker, pubname: "The New Yorker", paywalled: true, fulltext: false, tags: [ideas, books, arts], weight: 1.3}

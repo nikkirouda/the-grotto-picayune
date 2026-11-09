@@ -1,14 +1,21 @@
 name: build
-# Gathers the sources when the paper is opened or refreshed on a device holding the owner's token (the page asks
-# GitHub to run this), and on every push. There is no clock: nothing runs while nobody is reading.
-# The 14-day archive lives in the Actions cache.
+# Gathers the sources once a day before dawn (Captain's word 2026-11-09), on request from the paper (a device
+# holding the owner's key opens it or taps ↻, in quick mode), and on every push. The 14-day archive lives in
+# the Actions cache.
 on:
+  schedule:
+    - cron: "0 8 * * *"        # 3 AM Eastern in winter, 4 AM in summer
   workflow_dispatch:
+    inputs:
+      quick:
+        description: "Quick gathering: fewer photo and article look-ups, so the edition lands in about two minutes"
+        type: boolean
+        default: false
   push:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write           # only for the weekly heartbeat commit that keeps the daily schedule alive
   pages: write
   id-token: write
 
@@ -39,6 +46,7 @@ jobs:
       - name: Fetch sources and build the bundle
         env:
           NEWS_PASSPHRASE: ${{ secrets.NEWS_PASSPHRASE }}
+          QUICK: ${{ inputs.quick }}
         run: python3 build/fetch.py
       - name: Save the archive for the next run
         if: always()
@@ -46,6 +54,15 @@ jobs:
         with:
           path: data
           key: store-${{ github.run_id }}
+      - name: Weekly heartbeat (GitHub pauses schedules in repos with no commits for 60 days)
+        if: github.event_name == 'schedule'
+        run: |
+          date -u +%G-W%V > .heartbeat
+          if ! git diff --quiet -- .heartbeat; then
+            git config user.name "picayune-bot"
+            git config user.email "picayune-bot@users.noreply.github.com"
+            git add .heartbeat && git commit -q -m "heartbeat [skip ci]" && git push -q origin HEAD:main || echo "heartbeat push skipped"
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

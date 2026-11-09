@@ -11,6 +11,7 @@ Environment:
   STORE_PATH        where the 14-day archive lives (default data/store.json; kept in the Actions cache)
   OG_BUDGET         how many article pages to visit for a missing photo per run (default 80)
   ARTICLE_BUDGET    how many new stories get their full text fetched per run (default 250)
+  QUICK             "true" for an on-demand gathering: budgets 40 and 80, so the edition lands in about two minutes
 """
 import concurrent.futures as cf
 import datetime as dt
@@ -146,7 +147,7 @@ def fetch_source(src, http_cache):
         headers["If-Modified-Since"] = cache["last_modified"]
     t0 = time.time()
     try:
-        r = requests.get(src["url"], headers=headers, timeout=25)
+        r = requests.get(src["url"], headers=headers, timeout=15)
     except Exception as ex:
         return sid, None, f"error {type(ex).__name__}", time.time() - t0, cache
     if r.status_code == 304:
@@ -395,7 +396,7 @@ def article_text(rec):
     if trafilatura is None:
         return None
     try:
-        r = requests.get(url, headers={"User-Agent": UA, "Accept": "text/html"}, timeout=12, stream=True)
+        r = requests.get(url, headers={"User-Agent": UA, "Accept": "text/html"}, timeout=10, stream=True)
         if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
             return None
         html_text = r.raw.read(1_500_000, decode_content=True).decode(r.encoding or "utf-8", "ignore")
@@ -493,7 +494,11 @@ def main():
 
     # 1. fetch all feeds
     results = {}
-    with cf.ThreadPoolExecutor(max_workers=16) as ex:
+    quick = os.environ.get("QUICK", "").strip().lower() in ("1", "true", "yes")
+    if quick:
+        os.environ.setdefault("OG_BUDGET", "40"); os.environ.setdefault("ARTICLE_BUDGET", "80")
+        log("quick gathering")
+    with cf.ThreadPoolExecutor(max_workers=32) as ex:
         for sid, items, status, secs, cache in ex.map(lambda s: fetch_source(s, store["http"]), feeds):
             results[sid] = (items, status)
             store["http"][sid] = cache
@@ -590,10 +595,12 @@ def main():
 
     # 5. weather
     weather = {}
-    for place in prefs.get("places", []):
-        w = weather_for(place)
-        if w:
-            weather[place["id"]] = w
+    places = prefs.get("places", [])
+    if places:
+        with cf.ThreadPoolExecutor(max_workers=min(8, len(places))) as ex:
+            for place, w in zip(places, ex.map(weather_for, places)):
+                if w:
+                    weather[place["id"]] = w
 
     # 6. publish bundle (last PUBLISH_DAYS, muted sources removed; blocking happens in the browser
     #    from the same preferences, so an edit there takes effect without a rebuild)
