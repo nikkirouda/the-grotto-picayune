@@ -643,11 +643,11 @@ def main():
                 if w:
                     weather[place["id"]] = w
 
-    # 6. publish bundle (last PUBLISH_DAYS, muted sources removed; blocking happens in the browser
+    # 6. publish bundle (last PUBLISH_DAYS; muted sources and sources no longer listed removed; blocking happens in the browser
     #    from the same preferences, so an edit there takes effect without a rebuild)
     muted = set(prefs.get("muted_sources", []))
     pub_cutoff = NOW - dt.timedelta(days=PUBLISH_DAYS)
-    items = [v for v in store["items"].values() if v["source"] not in muted and dt.datetime.fromisoformat(v["published"]) >= pub_cutoff]
+    items = [v for v in store["items"].values() if v["source"] not in muted and v["source"] in by_id and dt.datetime.fromisoformat(v["published"]) >= pub_cutoff]
     # collapse the same story from several sources
     seen_titles = {}
     for v in sorted(items, key=lambda r: by_id.get(r["source"], {}).get("weight", 1), reverse=True):
