@@ -285,9 +285,10 @@ function card(it, lead) {
   $$('a', n).forEach(a => a.addEventListener('click', () => markRead(it, n)));
   if (it.kind === 'video') { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· video/audio'; $('.meta', n).appendChild(b); }
   if (src.paywalled) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· subscriber, opens at the source'; $('.meta', n).appendChild(b); }
-  else if (!it.reader) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = src.reader && src.reader.tried >= 3 && src.reader.refused / src.reader.tried > 0.5 ? '· opens at source (site blocks readers)' : '· opens at source'; $('.meta', n).appendChild(b); }
-  if (it.reader) {
-    $('.rd', n).textContent = '· in the paper';
+  else if (!it.reader && !canFetchOnTap(it)) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = siteBlocksReader(src) ? '· opens at source (site blocks readers)' : '· opens at source'; $('.meta', n).appendChild(b); }
+  else if (!it.reader) { const b = document.createElement('span'); b.className = 'kind'; b.textContent = '· fetched when you open it'; $('.meta', n).appendChild(b); }
+  if (it.reader || canFetchOnTap(it)) {
+    if (it.reader) $('.rd', n).textContent = '· in the paper';
     for (const a of [$('.title', n), $('.thumb', n)]) a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); openReader(it, n); });
   }
   $('.up', n).onclick = () => vote(it, +1, n);
@@ -306,7 +307,7 @@ async function openReader(it, n) {
   $('#readerSrc').textContent = it._src;
   $('#readerOpen').href = it.url;
   $('#readerTitle').textContent = it.title;
-  $('#readerMeta').textContent = `${new Date(it.published).toLocaleString()} · about ${Math.max(1, Math.round(it.reader / 230))} min read`;
+  $('#readerMeta').textContent = new Date(it.published).toLocaleString() + (it.reader ? ` · about ${Math.max(1, Math.round(it.reader / 230))} min read` : '');
   const img = $('#readerImg');
   if (it.image && opts.images) { img.src = it.image; img.classList.remove('hidden'); img.onerror = () => img.classList.add('hidden'); } else img.classList.add('hidden');
   $('#readerText').innerHTML = '<p class="muted">Loading…</p>';
@@ -320,6 +321,21 @@ async function openReader(it, n) {
   if (n) markRead(it, n);
   try {
     let text, art;
+    if (!it.reader) art = await fetchOnTap(it);
+    else try { art = await editionArticle(it); }
+    catch (e) { if (e.message !== 'missing' || !canFetchOnTap(it)) throw e; art = await fetchOnTap(it); }
+    if (!art) return;                                   // the reader was closed while we waited
+    text = art.text || '';
+    if (readerItem !== it) return;
+    $('#readerFoot').textContent = '';
+    renderArticle(it, art, text);
+  } catch (e) {
+    if (readerItem !== it) return;
+    $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">The full text is not in the paper just now (${esc(e.message)}). <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a>, or try again after the next edition.</p>`;
+  }
+}
+async function editionArticle(it) {
+    let art;
     if (manifest.encrypted) {
       const pass = LS.get('pass', null);
       if (!articleKey) articleKey = await deriveKey(pass, b64ToBytes(manifest.salt), 'decrypt');
@@ -344,8 +360,42 @@ async function openReader(it, n) {
     } else {
       art = await fetch(`data/a/${it.id}.json`, { cache: 'force-cache' }).then(x => { if (!x.ok) throw new Error('missing'); return x.json(); });
     }
-    text = art.text || '';
-    if (readerItem !== it) return;
+    return art;
+}
+// ------------------------------------------------------------- fetch on tap (Captain's word 2026-11-10)
+// A story the edition does not carry is fetched by a one-story GitHub run (read.yml) and left, encrypted, on
+// the repository's `reader` branch. Only devices holding the owner's key can ask; it takes about a minute.
+function siteBlocksReader(src) { return !!(src.reader && src.reader.tried >= 3 && src.reader.refused / src.reader.tried > 0.5); }
+function canFetchOnTap(it) {
+  const src = sourceById[it.source] || {};
+  return !!LS.get('token', '') && !src.paywalled && src.fulltext !== false && !siteBlocksReader(src) && it.kind !== 'video';
+}
+async function readerBranchFile(it) {
+  const d = await gh(`contents/a/${it.id}.bin?ref=reader`, { cache: 'no-store' }).catch(() => null);
+  return d && d.content ? b64ToBytes(d.content) : null;
+}
+async function openOnTapFile(bytes) {
+  const art = manifest.encrypted ? JSON.parse(new TextDecoder().decode(await decrypt(bytes, LS.get('pass', null)))) : JSON.parse(new TextDecoder().decode(bytes));
+  if (!art.text) throw new Error(art.why || 'the site gave no story text');
+  return art;
+}
+async function fetchOnTap(it) {
+  let bytes = await readerBranchFile(it);               // fetched earlier, on this device or another
+  if (bytes) return openOnTapFile(bytes);
+  if (!await gh('actions/workflows/read.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { id: it.id } }) })) throw new Error('GitHub could not find the fetch-on-tap job');
+  const t0 = Date.now();
+  const show = () => { if (readerItem === it) $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">Fetching the full story into the paper… ${Math.round((Date.now() - t0) / 1000)}s (usually under a minute). <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Or read it at ${esc(it._src)} ↗</a></p>`; };
+  show();
+  while (Date.now() - t0 < 4 * 60e3) {
+    await new Promise(r => setTimeout(r, 5000));
+    if (readerItem !== it) return null;
+    show();
+    bytes = await readerBranchFile(it);
+    if (bytes) return openOnTapFile(bytes);
+  }
+  throw new Error('the fetch took longer than four minutes');
+}
+function renderArticle(it, art, text) {
     const hero = it.image ? imgKey(it.image) : null;
     $('#readerText').innerHTML = art.html ? sanitizeArticle(art.html, hero) : text.split(/\n{1,}/).map(par => par.trim()).filter(Boolean).map(par => par.length < 80 && !/[.!?]$/.test(par) ? `<h3>${esc(par)}</h3>` : `<p>${esc(par)}</p>`).join('');
     const extra = (art.images || []).filter(im => opts.images && imgKey(im.src) !== hero);
@@ -364,9 +414,6 @@ async function openReader(it, n) {
     const first = $('#readerText').firstElementChild;
     if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
-  } catch (e) {
-    $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">The full text is not in the paper just now (${esc(e.message)}). <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a>, or try again after the next edition.</p>`;
-  }
 }
 function imgKey(u) { try { const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }
 const READER_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'STRONG', 'EM', 'B', 'I', 'BR', 'IMG', 'FIGURE', 'FIGCAPTION']);

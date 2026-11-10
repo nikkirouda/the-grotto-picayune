@@ -1,0 +1,66 @@
+name: read
+# Fetch on tap (Captain's word 2026-11-10): a device holding the owner's key opens a story the edition does
+# not carry, and the page asks for this run. It fetches that one story (only a story already in the archive),
+# encrypts it, and puts it on the `reader` branch, where the page picks it up — usually under a minute.
+# It never deploys the site and never writes to main.
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "Story id (16 hex characters, from the paper)"
+        required: true
+        type: string
+
+permissions:
+  contents: write           # the push to the reader branch, and nothing else
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: build/requirements.txt
+      - run: pip install -r build/requirements.txt
+      - name: Restore the archive (read only; this run never saves it)
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: store-none
+          restore-keys: store-
+      - name: Fetch the one story
+        env:
+          STORY_ID: ${{ inputs.id }}
+          NEWS_PASSPHRASE: ${{ secrets.NEWS_PASSPHRASE }}
+        run: python3 build/read_one.py
+      - name: Put it on the reader branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STORY_ID: ${{ inputs.id }}
+        run: |
+          set -e
+          url="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          for i in 1 2 3 4 5 6; do
+            rm -rf "$RUNNER_TEMP/pub" && mkdir "$RUNNER_TEMP/pub" && cd "$RUNNER_TEMP/pub"
+            git init -q && git config user.name "picayune-bot" && git config user.email "picayune-bot@users.noreply.github.com" && git config core.hooksPath /dev/null
+            lease=""
+            if git fetch -q --depth 1 "$url" reader 2>/dev/null; then lease=$(git rev-parse FETCH_HEAD); git checkout -q FETCH_HEAD -- .; fi
+            mkdir -p a && cp "$GITHUB_WORKSPACE/out/"*.bin a/
+            for f in a/*.bin; do grep -qx "$(basename "$f" .bin)" "$GITHUB_WORKSPACE/out/live.txt" || rm -f "$f"; done
+            git add -A && git commit -q -m "reader: ${STORY_ID} [skip ci]"
+            # one commit, no history: the branch holds only the stories still in the archive
+            if [ -n "$lease" ]; then
+              git push -q --force-with-lease="reader:${lease}" "$url" HEAD:refs/heads/reader && exit 0
+            else
+              git push -q "$url" HEAD:refs/heads/reader && exit 0
+            fi
+            sleep $((i * 2))
+          done
+          echo "could not update the reader branch"; exit 1

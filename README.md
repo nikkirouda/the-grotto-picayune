@@ -82,6 +82,11 @@ site/ (index.html, app.js) ──► GitHub Pages
 - ★ **Topics** (top right) is where new likes and dislikes go as you think of them: *More of this* floats
   matching stories up; *None of this* removes them. Each chip shows how many of the week's stories it touches.
 - A headline marked *in the paper* opens inside the page; ⌘/Ctrl-click still opens the source.
+- **Fetch on tap** (owner's devices only): a story the edition doesn't carry, from a site that lets the
+  reader in, says *fetched when you open it*. Opening it asks GitHub for a one-story run (`read.yml` →
+  `build/read_one.py`), which fetches only a story already in the archive, encrypts it with the paper's
+  passphrase, and leaves it on the `reader` branch (one commit, pruned to the archive); the page picks it up,
+  usually within a minute. Sites that block readers, subscriber papers and video still open at the source.
 - 👍 / 👎 on any card teaches the ranking; *mute* silences a source; *block…* removes a word everywhere.
 - Settings shows what has been learned, the source health from the last build, and backup/restore.
 - To add a public source: a line in `feeds.yml`, commit. To add a place or a private source, or to
