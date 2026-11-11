@@ -206,7 +206,7 @@ function visibleItems() {
     if (!opts.showHidden && sc.L.total <= hideAt && !votes[it.id]) { hidden++; continue; }
     if (opts.hideRead && read[it.id] && !query) continue;      // read pieces leave the lists; search still finds them
     if (opts.hideVideo && it.kind === 'video') continue;
-    if (opts.paperOnly && !it.reader && !srcInfo.paywalled && !query) continue;
+    if (opts.paperOnly && !it.reader && !srcInfo.paywalled && !query && !canFetchOnTap(it)) continue;
     it._sc = sc;
     out.push(it);
   }
