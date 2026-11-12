@@ -194,3 +194,4 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .icon-btn.busy { animation: spin 1s linear infinite; }
+.key-ok { color: var(--like); font-weight: 600; } .key-bad { color: var(--dislike); font-weight: 600; } .key-none { color: var(--muted); }

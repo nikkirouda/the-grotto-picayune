@@ -323,7 +323,7 @@ async function openReader(it, n) {
     let text, art;
     if (!it.reader) art = await fetchOnTap(it);
     else try { art = await editionArticle(it); }
-    catch (e) { if (e.message !== 'missing' || !canFetchOnTap(it)) throw e; art = await fetchOnTap(it); }
+    catch (e) { if (!/^missing|server answered/.test(e.message) || !canFetchOnTap(it)) throw e; art = await fetchOnTap(it); }
     if (!art) return;                                   // the reader was closed while we waited
     text = art.text || '';
     if (readerItem !== it) return;
@@ -339,11 +339,19 @@ async function editionArticle(it) {
     if (manifest.encrypted) {
       const pass = LS.get('pass', null);
       if (!articleKey) articleKey = await deriveKey(pass, b64ToBytes(manifest.salt), 'decrypt');
+      // GitHub's page servers now and then answer 503, or hand back a 404 they cached a moment before the
+      // file arrived; four tries over ~10 s, the later ones with a fresh query so no cached answer is reused.
       const fetchBin = async () => {
-        let x = await fetch(`data/a/${it.id}.bin`, { cache: 'no-store' });
-        if (!x.ok) { await new Promise(r => setTimeout(r, 1500)); x = await fetch(`data/a/${it.id}.bin`, { cache: 'reload' }); }
-        if (!x.ok) throw new Error('missing');
-        return x.arrayBuffer();
+        let x, last = 0;
+        for (const [i, wait] of [0, 1000, 3000, 6000].entries()) {
+          if (wait) await new Promise(r => setTimeout(r, wait));
+          if (readerItem !== it) throw new Error('closed');
+          const q = i < 2 ? '' : `?r=${Date.now()}`;
+          try { x = await fetch(`data/a/${it.id}.bin${q}`, { cache: i ? 'reload' : 'no-store' }); } catch { x = null; }
+          if (x && x.ok) return x.arrayBuffer();
+          last = x ? x.status : 0;
+        }
+        throw new Error(last === 404 ? 'missing' : `the paper's server answered ${last || 'nothing'}`);
       };
       let buf = new Uint8Array(await fetchBin());
       let plain;
@@ -658,7 +666,20 @@ function wireWelcome() {
   $('#wKeep').onclick = () => closeWelcome(false);
   $('#rerunWelcome').onclick = () => { openSettings(false); openWelcome(); };
 }
-function openSettings(open) { if (open) { openTopics(false); openMenu(false); } $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) fillSettings(); }
+// Says plainly whether this device holds a working owner's key (Captain's ask 2026-11-12: "how do I know it took?").
+async function checkKey() {
+  const el = $('#keyState'); if (!el) return;
+  if (!LS.get('token', '')) { el.textContent = 'No key on this device: stories not in the edition open at the source.'; el.className = 'small key-none'; return; }
+  el.textContent = 'Checking the key with GitHub…'; el.className = 'small muted';
+  try {
+    const wf = await gh('actions/workflows');
+    const ok = wf && (wf.workflows || []).some(w => /read\.yml$/.test(w.path));
+    if (!ok) throw new Error('GitHub did not show this paper\'s jobs to the key');
+    await gh('contents/README.md');
+    el.textContent = '✓ Key works on this device: fresh editions on open, and stories fetched when you tap them.'; el.className = 'small key-ok';
+  } catch (e) { el.textContent = `✗ The key did not work (${e.message}). Check it is for this repository, with Actions and Contents set to read and write.`; el.className = 'small key-bad'; }
+}
+function openSettings(open) { if (open) { openTopics(false); openMenu(false); } $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) { fillSettings(); checkKey(); } }
 function openTopics(open) { if (open) { openSettings(false); openMenu(false); } $('#topics').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#topics').setAttribute('aria-hidden', String(!open)); if (open) { fillTopics(); setTimeout(() => $('#addBoost input').focus(), 250); } }
 function countHits(term) {
   const re = termRegex([term]); if (!re) return 0;
@@ -740,7 +761,8 @@ function wireSettings() {
   $('#hideThreshold').onchange = e => { savePrefsLocal({ hide_threshold: parseFloat(e.target.value) }); buildList(); };
   $('#resetVotes').onclick = () => { if (confirm('Forget every like and dislike?')) { votes = {}; LS.set('votes', votes); rebuildModel(); fillLearned(); buildList(); scheduleSync(); } };
   $('#repo').onchange = e => LS.set('repo', e.target.value.trim());
-  $('#token').onchange = e => LS.set('token', e.target.value.trim());
+  $('#token').onchange = e => { LS.set('token', e.target.value.trim()); checkKey(); buildList(); };
+  $('#repo').addEventListener('change', () => checkKey());
   $('#syncBtn').onclick = () => sync(true);
   $('#rebuildBtn').onclick = () => { openSettings(false); gather(true); };
   $('#exportBtn').onclick = () => {
