@@ -800,6 +800,24 @@ function applyReaderSize() {
   $('#sizeDown').disabled = i === 0; $('#sizeUp').disabled = i === READER_SIZES.length - 1;
 }
 function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length - 1, Math.max(0, LS.get('readerSize', 1) + d))); applyReaderSize(); }
+// The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
+// newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
+// box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
+const APP_VERSION = 'picayune-shell-v9';   // keep equal to SHELL in sw.js
+let lastVersionCheck = 0, newVersionWaiting = false;
+async function checkForNewVersion() {
+  if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
+  lastVersionCheck = Date.now();
+  try {
+    if (!newVersionWaiting) {
+      const t = await fetch('sw.js', { cache: 'no-store' }).then(r => r.ok ? r.text() : '');
+      const m = t.match(/picayune-shell-v\d+/);
+      newVersionWaiting = !!(m && m[0] !== APP_VERSION);
+    }
+    const busy = readerItem || document.querySelector('.drawer.open') || !$('#welcome').classList.contains('hidden') || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName));
+    if (newVersionWaiting && !busy && document.visibilityState === 'visible') location.reload();
+  } catch {}
+}
 function wireSettings() {
   $('#sizeDown').onclick = () => stepReaderSize(-1);
   $('#sizeUp').onclick = () => stepReaderSize(+1);
@@ -850,6 +868,8 @@ function wireSettings() {
   $('#moreBtn').onclick = renderMore;
   $('#refreshBtn').onclick = () => refreshNews(true);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bundle && Date.now() - lastCheck > 10 * 60e3) gather(false); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForNewVersion(); });
+  setInterval(checkForNewVersion, 30 * 60e3);
   $('#readerBack').onclick = () => closeReader(false);
   document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (readerItem) closeReader(false); else if ($('#menu').classList.contains('open')) openMenu(false); });
   window.addEventListener('popstate', () => { if (readerItem && !location.hash.endsWith('/read')) closeReader(true); });
