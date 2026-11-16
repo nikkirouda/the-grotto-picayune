@@ -493,13 +493,14 @@ def weather_for(place, attempt=0):
         if attempt == 0:
             time.sleep(3)
             return weather_for(place, 1)
-        log("weather", place["id"], type(ex).__name__)
+        log("weather: one place failed,", type(ex).__name__)   # never the place: build logs are public
         return None
 
 # ---------------------------------------------------------------- main
 def main():
     passphrase = os.environ.get("NEWS_PASSPHRASE", "").strip()
     feeds = yaml.safe_load(open(os.path.join(ROOT, "feeds.yml"), encoding="utf-8"))["sources"]
+    public_ids = {f["id"] for f in feeds}   # only these are ever named in the log (it is public on GitHub)
     private = load_private()   # the owner's key (PRIVATE_PASSPHRASE), never needed by readers
     if private:
         feeds = feeds + list(private.get("sources", []))
@@ -517,6 +518,7 @@ def main():
 
     # 1. fetch all feeds
     results = {}
+    private_status = {}   # private sources: counted by outcome, never named
     quick = os.environ.get("QUICK", "").strip().lower() in ("1", "true", "yes")
     if quick:
         if not os.environ.get("OG_BUDGET"): os.environ["OG_BUDGET"] = "40"
@@ -530,7 +532,12 @@ def main():
             h["last_status"] = status; h["last_checked"] = NOW.isoformat()
             if items is not None:
                 h["last_ok"] = NOW.isoformat()
-            log(f"{sid:18} {status:14} {secs:4.1f}s")
+            if sid in public_ids:
+                log(f"{sid:18} {status:14} {secs:4.1f}s")
+            else:
+                private_status[str(status).split(" ")[0]] = private_status.get(str(status).split(" ")[0], 0) + 1
+    if private_status:
+        log("private sources (not named):", ", ".join(f"{n} {k}" for k, n in sorted(private_status.items())))
 
     # 2. merge into the store
     new_ids = []

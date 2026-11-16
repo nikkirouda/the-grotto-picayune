@@ -46,7 +46,7 @@ sources:
   - {id: gbh, name: GBH News, url: "https://www.wgbh.org/news.rss", home: "https://www.wgbh.org/news", section: local-ne, tags: [boston, new-england], place: boston, weight: 1.2}
   - {id: boston-com, name: Boston.com, url: "https://www.boston.com/feed/", home: "https://www.boston.com", section: local-ne, tags: [boston], place: boston, weight: 0.8}
   - {id: universalhub, name: Universal Hub, url: "https://www.universalhub.com/uhub.xml", home: "https://www.universalhub.com", section: local-ne, tags: [boston], place: boston, weight: 0.8}
-  - {id: nehs, name: New England Historical Society, url: "https://newenglandhistoricalsociety.com/feed/", home: "https://newenglandhistoricalsociety.com", section: local-ne, tags: [new-england, history], weight: 1.1, place: boston}
+  # New England Historical Society dropped 2026-11-16: refuses GitHub's servers (403). Yankee, below, already covers the region.
   - {id: yankee, name: Yankee Magazine, url: "https://newengland.com/feed/", home: "https://newengland.com", section: local-ne, tags: [new-england, travel], place: boston}
   - {id: nhpr, name: New Hampshire Public Radio, url: "https://www.nhpr.org/news.rss", home: "https://www.nhpr.org", section: local-ne, tags: [new-england], weight: 0.7}
   - {id: vtdigger, name: VTDigger, url: "https://vtdigger.org/feed/", home: "https://vtdigger.org", section: local-ne, tags: [new-england], weight: 0.7}
@@ -57,15 +57,16 @@ sources:
   - {id: awaytogarden, name: A Way to Garden, url: "https://awaytogarden.com/feed/", home: "https://awaytogarden.com", section: garden, tags: [garden], weight: 1.2}
   - {id: gardenista, name: Gardenista, url: "https://www.gardenista.com/feed/", home: "https://www.gardenista.com", section: garden, tags: [garden], weight: 0.9}
   - {id: uri-extension, name: URI Cooperative Extension, url: "https://web.uri.edu/coopext/feed/", home: "https://web.uri.edu/coopext/", section: garden, tags: [garden, rhode-island], weight: 1.0}
-  - {id: oldhouse, name: Old House Journal, url: "https://www.oldhouseonline.com/feed", home: "https://www.oldhouseonline.com", section: house, tags: [old-house], weight: 1.2}
-  - {id: thisoldhouse, name: This Old House, url: "https://www.thisoldhouse.com/feed", home: "https://www.thisoldhouse.com", section: house, tags: [old-house, diy]}
+  # Old House Journal (no longer connects) and This Old House (feed errors) dropped 2026-11-16, checked again that day.
+  - {id: finehomebuilding, name: Fine Homebuilding, url: "https://www.finehomebuilding.com/feed", home: "https://www.finehomebuilding.com", section: house, tags: [old-house, diy], weight: 1.2}
+  - {id: oldhouseguy, name: Old House Guy, url: "https://www.oldhouseguy.com/feed/", home: "https://www.oldhouseguy.com", section: house, tags: [old-house], weight: 1.0}
   - {id: craftsman-blog, name: The Craftsman Blog, url: "https://thecraftsmanblog.com/feed/", home: "https://thecraftsmanblog.com", section: house, tags: [old-house, diy], weight: 1.2}
   - {id: circa, name: Circa Old Houses, url: "https://circaoldhouses.com/feed/", home: "https://circaoldhouses.com", section: house, tags: [old-house], weight: 0.9}
   - {id: family-handyman, name: Family Handyman, url: "https://www.familyhandyman.com/feed/", home: "https://www.familyhandyman.com", section: house, tags: [diy], weight: 0.8}
   - {id: hagerty, name: Hagerty Media, url: "https://www.hagerty.com/media/feed/", home: "https://www.hagerty.com/media", section: cars, tags: [cars, vintage], weight: 1.2}
   - {id: the-drive, name: The Drive, url: "https://www.thedrive.com/feed", home: "https://www.thedrive.com", section: cars, tags: [cars], weight: 0.8}
   - {id: silodrome, name: Silodrome, url: "https://silodrome.com/feed/", home: "https://silodrome.com", section: cars, tags: [cars, vintage], weight: 0.9}
-  - {id: espn-nfl, name: ESPN NFL, url: "https://www.espn.com/espn/rss/nfl/news", home: "https://www.espn.com/nfl/", section: football, tags: [nfl], weight: 1.2}
+  # ESPN NFL and ESPN Fantasy dropped 2026-11-16: ESPN answers GitHub's servers with an empty 202 (a data-centre block).
   - {id: pft, name: Pro Football Talk, url: "https://www.nbcsports.com/profootballtalk.rss", home: "https://profootballtalk.nbcsports.com", section: football, tags: [nfl], weight: 0.8}
   - {id: patriots, name: Patriots.com, url: "https://www.patriots.com/rss/news", home: "https://www.patriots.com", section: football, tags: [nfl, patriots], weight: 0.8}
   - {id: gbh-beer, name: Good Beer Hunting, url: "https://www.goodbeerhunting.com/blog?format=rss", home: "https://www.goodbeerhunting.com", section: beer-food, tags: [beer], weight: 1.2}
@@ -100,7 +101,8 @@ sources:
   - {id: hooniverse, name: Hooniverse, url: "https://www.hooniverse.com/feed/", home: "https://www.hooniverse.com", section: cars, tags: [cars, vintage], weight: 0.8}
   - {id: dmdavid, name: DM David, url: "https://dmdavid.com/feed/", home: "https://dmdavid.com", section: games, tags: [dnd, tabletop], weight: 1.0}
   - {id: sly-flourish, name: Sly Flourish, url: "https://slyflourish.com/index.xml", home: "https://slyflourish.com", section: games, tags: [dnd, tabletop], weight: 1.0}
-  - {id: espn-fantasy, name: ESPN Fantasy, url: "https://www.espn.com/espn/rss/fantasy/news", home: "https://www.espn.com/fantasy/", section: fantasy, tags: [nfl, fantasy], weight: 1.0}
+  - {id: rotoballer, name: RotoBaller NFL, url: "https://www.rotoballer.com/category/nfl/feed", home: "https://www.rotoballer.com/nfl", section: fantasy, tags: [fantasy, nfl], weight: 0.9}
+  - {id: rotoworld, name: NBC Rotoworld Football, url: "https://www.nbcsports.com/fantasy/football.rss", home: "https://www.nbcsports.com/fantasy/football", section: fantasy, tags: [fantasy, nfl], weight: 1.1}
   - {id: polygon, name: Polygon, url: "https://www.polygon.com/feed/", home: "https://www.polygon.com", section: games, tags: [videogames, tabletop], weight: 0.8}
   # ---- Brown (Captain's ask 2026-11-16): the student paper itself, beside the Brown lens. The Herald refuses
   #      every automated reader (403 from its own feed, robots.txt included, from GitHub's runners too), so its
