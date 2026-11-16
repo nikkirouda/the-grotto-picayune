@@ -679,6 +679,34 @@ function wireWelcome() {
   $('#rerunWelcome').onclick = () => { openSettings(false); openWelcome(); };
 }
 // Says plainly whether this device holds a working owner's key (Captain's ask 2026-11-12: "how do I know it took?").
+// Opens the private file with a passphrase and says plainly whether it is the right one (Captain's ask
+// 2026-11-16). Nothing is changed in the repository; a right passphrase is remembered on this device.
+async function privateBlob() {
+  if (LS.get('token', '')) { const pf = await gh('contents/private.enc', { cache: 'no-store' }); if (pf && pf.content) return b64ToBytes(pf.content).buffer; }
+  const repo = LS.get('repo', guessRepo()) || 'nikkirouda/the-grotto-picayune';
+  const r = await fetch(`https://raw.githubusercontent.com/${repo}/main/private.enc`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`could not read your private file (${r.status})`);
+  return r.arrayBuffer();
+}
+async function checkOwnPass(candidate) {
+  const el = $('#ownState'); if (!el) return;
+  const own = candidate || LS.get('ownerPass', null);
+  if (!own) { el.textContent = 'Not entered on this device yet. Only Sync needs it; reading and fetching stories do not.'; el.className = 'small key-none'; return; }
+  el.textContent = 'Checking…'; el.className = 'small muted';
+  let blob;
+  try { blob = await privateBlob(); } catch (e) { el.textContent = `Could not check just now (${e.message}).`; el.className = 'small key-bad'; return; }
+  const opens = async p => { try { JSON.parse(new TextDecoder().decode(await decrypt(blob, p))); return true; } catch { return false; } };
+  if (await opens(own)) {
+    LS.set('ownerPass', own); $('#ownPass').value = '';
+    el.textContent = '✓ Your own passphrase is right, and remembered on this device. Sync will work here.'; el.className = 'small key-ok';
+  } else if (await opens(LS.get('pass', null))) {
+    el.textContent = 'Your private file is still locked with the regular passphrase, so Sync works with that for now.'; el.className = 'small key-ok';
+  } else {
+    if (!candidate) LS.del('ownerPass');
+    el.textContent = candidate ? '✗ That is not the passphrase that locks your private file. Nothing was saved; try again.' : '✗ The passphrase saved on this device no longer opens your private file. Type it again above.';
+    el.className = 'small key-bad';
+  }
+}
 async function checkKey() {
   const el = $('#keyState'); if (!el) return;
   if (!LS.get('token', '')) { el.textContent = 'No key on this device: stories not in the edition open at the source.'; el.className = 'small key-none'; return; }
@@ -691,7 +719,7 @@ async function checkKey() {
     el.textContent = '✓ Key works on this device: fresh editions on open, and stories fetched when you tap them.'; el.className = 'small key-ok';
   } catch (e) { el.textContent = `✗ The key did not work (${e.message}). Check it is for this repository, with Actions and Contents set to read and write.`; el.className = 'small key-bad'; }
 }
-function openSettings(open) { if (open) { openTopics(false); openMenu(false); } $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) { fillSettings(); checkKey(); } }
+function openSettings(open) { if (open) { openTopics(false); openMenu(false); } $('#settings').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#settings').setAttribute('aria-hidden', String(!open)); if (open) { fillSettings(); checkKey(); checkOwnPass(); } }
 function openTopics(open) { if (open) { openSettings(false); openMenu(false); } $('#topics').classList.toggle('open', open); $('#scrim').classList.toggle('show', open); $('#topics').setAttribute('aria-hidden', String(!open)); if (open) { fillTopics(); setTimeout(() => $('#addBoost input').focus(), 250); } }
 function countHits(term) {
   const re = termRegex([term]); if (!re) return 0;
@@ -775,6 +803,8 @@ function wireSettings() {
   $('#repo').onchange = e => LS.set('repo', e.target.value.trim());
   $('#token').onchange = e => { LS.set('token', e.target.value.trim()); checkKey(); buildList(); };
   $('#repo').addEventListener('change', () => checkKey());
+  $('#checkOwn').onclick = () => { const v = $('#ownPass').value.trim(); if (v) checkOwnPass(v); else checkOwnPass(); };
+  $('#ownPass').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#checkOwn').click(); } });
   $('#syncBtn').onclick = () => sync(true);
   $('#rebuildBtn').onclick = () => { openSettings(false); gather(true); };
   $('#exportBtn').onclick = () => {
@@ -818,7 +848,7 @@ async function sync(manual) {
   try {
     // Your private file has its own key (security review 2026-11-09): friends' paper passphrase can't open it.
     let own = LS.get('ownerPass', null);
-    if (!own) { own = (window.prompt('Your own passphrase for your private file (the PRIVATE_PASSPHRASE secret). Asked once on this device.') || '').trim(); if (!own) throw new Error('Sync needs your own passphrase.'); }
+    if (!own) { const d = $('#ownPass').closest('details'); if (d) d.open = true; throw new Error('Sync needs your own passphrase: type it in the box above and tap Check it.'); }
     msg('Syncing…');
     const pf = await gh('contents/private.enc');
     if (!pf) throw new Error('private.enc is not in the repository yet.');
