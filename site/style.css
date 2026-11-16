@@ -160,20 +160,24 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 .reader-bar { position: sticky; top: 0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top)); background: var(--bg); border-bottom: 1px solid var(--line); z-index: 1; }
 .reader-src { flex: 1; color: var(--gold); font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reader-body { max-width: 680px; margin: 0 auto; padding: 16px 18px 60px; }
-.reader-body h1 { font-family: var(--font); font-size: 1.7rem; line-height: 1.2; margin: 8px 0 6px; }
+.reader-body h1 { font-family: var(--font); font-size: calc(1.7rem * var(--rs, 1)); line-height: 1.2; margin: 8px 0 6px; }
 .reader-meta { margin: 0 0 14px; font-size: .9rem; }
 .reader-body img { width: 100%; height: auto; border-radius: 10px; margin: 0 0 16px; display: block; }
-#readerText { font-family: var(--font); font-size: 1.12rem; line-height: 1.6; }
+#readerText { font-family: var(--font); font-size: calc(1.12rem * var(--rs, 1)); line-height: 1.6; }
 #readerText p { margin: 0 0 1em; }
-#readerText h3 { font-family: var(--sans); font-size: 1rem; margin: 1.4em 0 .5em; }
+#readerText h3 { font-family: var(--sans); font-size: calc(1rem * var(--rs, 1)); margin: 1.4em 0 .5em; }
 .reader-foot { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 24px; }
 .reader-actions { justify-content: center; gap: 16px; }
 .reader-actions .vote { font-size: 1.4rem; padding: 8px 14px; }
-@media (max-width: 640px) { .reader-body h1 { font-size: 1.4rem; } #readerText { font-size: 1.08rem; } }
+@media (max-width: 640px) { .reader-body h1 { font-size: calc(1.4rem * var(--rs, 1)); } #readerText { font-size: calc(1.08rem * var(--rs, 1)); } }
+.size-btns { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: 0 0 auto; }
+.size-btn { background: transparent; border: 0; color: var(--ink); font-family: var(--font); font-size: .85rem; padding: 4px 10px; min-width: 38px; min-height: 32px; }
+.size-btn.big { font-size: 1.1rem; border-left: 1px solid var(--line); }
+.size-btn:disabled { opacity: .35; }
 
 #readerText figure { margin: 1.2em 0; }
 #readerText figure img, #readerText > img, #readerText p > img { width: 100%; height: auto; border-radius: 10px; display: block; }
-#readerText figcaption { font-family: var(--sans); font-size: .82rem; color: var(--muted); margin-top: 6px; }
+#readerText figcaption { font-family: var(--sans); font-size: calc(.82rem * var(--rs, 1)); color: var(--muted); margin-top: 6px; }
 #readerText blockquote { margin: 1em 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .gallery { margin-top: 1.5em; border-top: 1px solid var(--line); padding-top: 6px; }
 

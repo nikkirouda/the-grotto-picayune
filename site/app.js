@@ -329,7 +329,8 @@ async function openReader(it, n) {
   $('#readerUp').onclick = () => { vote(it, +1, n || document.createElement('div')); $('#readerUp').classList.toggle('on', !!votes[it.id] && votes[it.id].v > 0); $('#readerDown').classList.toggle('on', !!votes[it.id] && votes[it.id].v < 0); };
   $('#readerDown').onclick = () => { vote(it, -1, n || document.createElement('div')); $('#readerUp').classList.toggle('on', !!votes[it.id] && votes[it.id].v > 0); $('#readerDown').classList.toggle('on', !!votes[it.id] && votes[it.id].v < 0); };
   r.classList.remove('hidden'); r.scrollTop = 0; document.body.style.overflow = 'hidden';
-  if (!location.hash.endsWith('/read')) history.pushState({ reader: it.id }, '', location.hash + '/read');
+  // with no section in the address, '/read' alone would become a page path that does not exist; always use the hash
+  if (!location.hash.endsWith('/read')) history.pushState({ reader: it.id }, '', (location.hash || '#/' + route) + '/read');
   if (n) markRead(it, n);
   try {
     let text, art;
@@ -791,7 +792,18 @@ function guessRepo() {
   const seg = location.pathname.split('/').filter(Boolean)[0];
   return m && seg ? `${m[1]}/${seg}` : '';
 }
+// Story text size (Captain's ask 2026-11-16): A− / A+ in the story bar, remembered on this device.
+const READER_SIZES = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
+function applyReaderSize() {
+  const i = Math.min(READER_SIZES.length - 1, Math.max(0, LS.get('readerSize', 1)));
+  $('#reader').style.setProperty('--rs', READER_SIZES[i]);
+  $('#sizeDown').disabled = i === 0; $('#sizeUp').disabled = i === READER_SIZES.length - 1;
+}
+function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length - 1, Math.max(0, LS.get('readerSize', 1) + d))); applyReaderSize(); }
 function wireSettings() {
+  $('#sizeDown').onclick = () => stepReaderSize(-1);
+  $('#sizeUp').onclick = () => stepReaderSize(+1);
+  applyReaderSize();
   $('#settingsBtn').onclick = () => openSettings(true);
   $('#closeSettings').onclick = () => openSettings(false);
   $('#topicsBtn').onclick = () => openTopics(true);
