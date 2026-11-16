@@ -5,11 +5,23 @@
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+// Every nikkirouda.github.io app shares one browser storage area, so the paper's keys carry their own
+// prefix (2026-11-16). A value saved under the old bare name is moved across the first time it is read.
+const NS = 'picayune:';
+const OLD_KEYS = new Set(['votes', 'read', 'opts', 'prefsLocal', 'pass', 'ownerPass', 'token', 'repo', 'visits', 'theme', 'welcomed', 'lastSync', 'deletedVotes']);
 const LS = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-  del(k) { try { localStorage.removeItem(k); } catch {} },
+  get(k, d) {
+    try {
+      let v = localStorage.getItem(NS + k);
+      if (v == null && OLD_KEYS.has(k)) { const old = localStorage.getItem(k); if (old != null) { try { JSON.parse(old); localStorage.setItem(NS + k, old); localStorage.removeItem(k); v = old; } catch {} } }
+      return v == null ? d : JSON.parse(v);
+    } catch { return d; }
+  },
+  set(k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(NS + k); localStorage.removeItem(k); } catch {} },
 };
+// Ask the browser not to clear the paper's storage when the phone runs short of space.
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {}); } catch {}
 const STOP = new Set('a an the and or but of to in on at for from by with as is are was were be been it its this that these those his her their our your you we they he she i me my us them than then there here who whom whose what which when where why how not no yes do does did done have has had will would can could should may might must shall into over under after before about above below between through during without within up down out off again further once more most some such only own same so too very just also new says said say says'.split(' '));
 
 // ------------------------------------------------------------- state
