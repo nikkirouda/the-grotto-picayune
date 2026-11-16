@@ -171,6 +171,13 @@ def fetch_source(src, http_cache):
                 break
         if not summary:
             summary = clean_text(e.get("summary", ""))
+        # a feed that tacks the paper's name onto every headline (Google News: "Headline - Paper") — strip it
+        suffix = src.get("title_suffix")
+        if suffix and title.endswith(suffix):
+            title = title[: -len(suffix)].rstrip(" -–—|")
+            if summary.lower().startswith(title.lower()):
+                summary = summary[len(title):]
+            summary = summary.replace(suffix.strip(" -–—|"), "").strip()
         if summary.lower().startswith(title.lower()):
             summary = summary[len(title):].lstrip(" .-–—:")
         img = abs_url(link, entry_image(e))

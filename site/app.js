@@ -344,7 +344,21 @@ async function openReader(it, n) {
     renderArticle(it, art, text);
   } catch (e) {
     if (readerItem !== it) return;
-    $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">The full text is not in the paper just now (${esc(e.message)}). <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a>, or try again after the next edition.</p>`;
+    const canLoad = canFetchOnTap(it);
+    $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">The full text is not in the paper just now (${esc(e.message)}). ${canLoad ? '<button class="load-now" id="loadNow">Load it now</button> fetches a fresh copy (about a minute), or ' : ''}<a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">read it at ${esc(it._src)} ↗</a>.</p>`;
+    if (canLoad) $('#loadNow').onclick = () => loadNow(it);
+  }
+}
+// "Load it now" (Captain's ask 2026-11-16): ask for a fresh one-story fetch even if the edition or an
+// earlier fetch had a copy that would not show.
+async function loadNow(it) {
+  try {
+    const art = await fetchOnTap(it, true);
+    if (!art || readerItem !== it) return;
+    renderArticle(it, art, art.text || '');
+  } catch (e) {
+    if (readerItem !== it) return;
+    $('#readerText').innerHTML = `${it.summary ? `<p>${esc(it.summary)}</p>` : ''}<p class="muted">The fresh copy would not show either (${esc(e.message)}). <a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Read it at ${esc(it._src)} ↗</a>.</p>`;
   }
 }
 async function editionArticle(it) {
@@ -400,8 +414,8 @@ async function openOnTapFile(bytes) {
   if (!art.text) throw new Error(art.why || 'the site gave no story text');
   return art;
 }
-async function fetchOnTap(it) {
-  let bytes = await readerBranchFile(it);               // fetched earlier, on this device or another
+async function fetchOnTap(it, fresh) {
+  let bytes = fresh ? null : await readerBranchFile(it);   // fetched earlier, on this device or another
   if (bytes) return openOnTapFile(bytes);
   if (!await gh('actions/workflows/read.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { id: it.id } }) })) throw new Error('GitHub could not find the fetch-on-tap job');
   const t0 = Date.now();
@@ -430,8 +444,9 @@ function renderArticle(it, art, text) {
       im.onload = () => { if (im.naturalWidth < 320 || im.naturalHeight < 160) dropImg(im); };   // placeholders and thumbnails never show full width
       if (im.complete && im.naturalWidth && (im.naturalWidth < 320 || im.naturalHeight < 160)) dropImg(im);
     });
-    const goodPars = $$('#readerText p').filter(p => p.textContent.trim().split(/\s+/).length >= 15).length;
-    if (goodPars < 2) throw new Error('the pulled text does not read like a story');
+    // two solid paragraphs, or one long one: The Onion's pieces are a single ~150-word paragraph (2026-11-16)
+    const pars = $$('#readerText p').map(p => p.textContent.trim().split(/\s+/).length).filter(n => n >= 15);
+    if (pars.length < 2 && !(pars[0] >= 80)) throw new Error('the pulled text does not read like a story');
     const first = $('#readerText').firstElementChild;
     if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
@@ -803,7 +818,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v9';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v10';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
