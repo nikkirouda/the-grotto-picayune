@@ -83,3 +83,6 @@ jobs:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v4
+      - name: Source report (public sources only)
+        if: always()
+        run: python3 build/source_report.py || true
