@@ -707,8 +707,16 @@ async function checkOwnPass(candidate) {
     el.className = 'small key-bad';
   }
 }
+function looksLikeKey(v) { return /^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(v); }
+function keyNotAKey(v) {
+  const el = $('#keyState'); if (!el) return;
+  el.textContent = `✗ What is in the box is not a GitHub key: it is ${v.length} characters and does not start with github_pat_. A password manager may have filled it in. Clear the box and paste the key from GitHub (about 93 characters).`;
+  el.className = 'small key-bad';
+}
 async function checkKey() {
   const el = $('#keyState'); if (!el) return;
+  const saved = LS.get('token', '');
+  if (saved && !looksLikeKey(saved)) { LS.del('token'); $('#token').value = ''; keyNotAKey(saved); return; }
   if (!LS.get('token', '')) { el.textContent = 'No key on this device: stories not in the edition open at the source.'; el.className = 'small key-none'; return; }
   el.textContent = 'Checking the key with GitHub…'; el.className = 'small muted';
   try {
@@ -801,7 +809,12 @@ function wireSettings() {
   $('#hideThreshold').onchange = e => { savePrefsLocal({ hide_threshold: parseFloat(e.target.value) }); buildList(); };
   $('#resetVotes').onclick = () => { if (confirm('Forget every like and dislike?')) { votes = {}; LS.set('votes', votes); rebuildModel(); fillLearned(); buildList(); scheduleSync(); } };
   $('#repo').onchange = e => LS.set('repo', e.target.value.trim());
-  $('#token').onchange = e => { LS.set('token', e.target.value.trim()); checkKey(); buildList(); };
+  $('#token').onchange = e => {
+    const v = e.target.value.trim();
+    // A password manager can fill this box with a saved password; only a real GitHub key is kept.
+    if (v && !looksLikeKey(v)) { LS.del('token'); keyNotAKey(v); return; }
+    LS.set('token', v); checkKey(); buildList();
+  };
   $('#repo').addEventListener('change', () => checkKey());
   $('#checkOwn').onclick = () => { const v = $('#ownPass').value.trim(); if (v) checkOwnPass(v); else checkOwnPass(); };
   $('#ownPass').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#checkOwn').click(); } });

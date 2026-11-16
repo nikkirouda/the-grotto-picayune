@@ -95,7 +95,7 @@
       <summary>Owner's key: gathering and sync</summary>
       <p class="muted small">The paper gathers fresh stories only when a device holding the owner's key opens it or taps ↻. Paste a GitHub fine-grained token for this site's repository with <b>Actions: read &amp; write</b> (for gathering) and <b>Contents: read &amp; write</b> (to share votes and preferences between your devices). It never leaves this device except to talk to GitHub. Readers without the key see the latest edition and can pull a newer one with ↻.</p>
       <label>Repository <input id="repo" placeholder="owner/name"></label>
-      <label>Token <input id="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+      <label>Token <input id="token" type="text" class="secret" name="picayune-github-key" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" placeholder="github_pat_… (paste the key from GitHub)"></label>
       <div class="row"><button id="syncBtn">Sync now</button><button id="rebuildBtn">Gather fresh stories now</button></div>
       <p id="keyState" class="small"></p>
       <label>Your own passphrase (for Sync; only you have it) <input id="ownPass" type="password" autocomplete="off" placeholder="not the one friends use"></label>
