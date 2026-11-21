@@ -515,7 +515,9 @@ def weather_for(place, attempt=0):
 # ---------------------------------------------------------------- main
 def main():
     passphrase = os.environ.get("NEWS_PASSPHRASE", "").strip()
-    feeds = yaml.safe_load(open(os.path.join(ROOT, "feeds.yml"), encoding="utf-8"))["sources"]
+    feeds_doc = yaml.safe_load(open(os.path.join(ROOT, "feeds.yml"), encoding="utf-8"))
+    feeds = feeds_doc["sources"]
+    public_sections = feeds_doc.get("sections") or []
     public_ids = {f["id"] for f in feeds}   # only these are ever named in the log (it is public on GitHub)
     private = load_private()   # the owner's key (PRIVATE_PASSPHRASE), never needed by readers
     if private:
@@ -769,6 +771,7 @@ def main():
         "items": out_items,
         "weather": weather,
         "prefs": prefs,
+        "public_sections": public_sections,
         "feedback": feedback,
         "sources": [{"id": s["id"], "name": s["name"], "home": s.get("home"), "section": s["section"], "weight": s.get("weight", 1.0),
                      "publication": s.get("publication"), "pubname": s.get("pubname"), "paywalled": bool(s.get("paywalled")),

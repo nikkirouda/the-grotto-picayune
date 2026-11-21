@@ -3,6 +3,10 @@
 #         fulltext (default true; false = never fetch this source's story text for the in-app reader)
 # Sources for private places live in private.enc (see README) and are merged in at build time.
 # Checked live 2026-11-07. No religious or religion-affiliated outlets (Captain's word 2026-11-09).
+# Sections declared here join every reader's list when their own settings don't already have them (sections
+# are not private; the owner's places and preferences stay in private.enc).
+sections:
+  - {id: entertainment, name: Entertainment}      # Captain's ask 2026-11-21
 sources:
   - {id: bbc-world, name: BBC News — World, url: "https://feeds.bbci.co.uk/news/world/rss.xml", home: "https://www.bbc.com/news/world", section: world, tags: [world], weight: 1.4}
   - {id: bbc-top, name: BBC News, url: "https://feeds.bbci.co.uk/news/rss.xml", home: "https://www.bbc.com/news", section: world, tags: [world], weight: 1.3}
@@ -153,3 +157,13 @@ sources:
   - {id: wapo-world,   name: The Washington Post — World, url: "https://feeds.washingtonpost.com/rss/world", home: "https://www.washingtonpost.com/world/", section: "pub:wapo", publication: wapo, pubname: "The Washington Post", paywalled: true, fulltext: false, tags: [world], weight: 1.3}
   - {id: atlantic,     name: The Atlantic,                url: "https://www.theatlantic.com/feed/all/", home: "https://www.theatlantic.com", section: "pub:atlantic", publication: atlantic, pubname: "The Atlantic", paywalled: true, fulltext: false, tags: [ideas, us], weight: 1.3}
   - {id: newyorker,    name: The New Yorker,              url: "https://www.newyorker.com/feed/everything", home: "https://www.newyorker.com", section: "pub:newyorker", publication: newyorker, pubname: "The New Yorker", paywalled: true, fulltext: false, tags: [ideas, books, arts], weight: 1.3}
+  # ---- Entertainment (Captain's ask 2026-11-21): reviews and criticism first, trade news turned down. Each checked
+  #      live that day with the paper's fetcher, full text 3 of 3. ----
+  - {id: guardian-film,  name: The Guardian — Film,          url: "https://www.theguardian.com/film/rss", home: "https://www.theguardian.com/film", section: entertainment, tags: [film], weight: 1.2}
+  - {id: guardian-tv,    name: The Guardian — TV & radio,    url: "https://www.theguardian.com/tv-and-radio/rss", home: "https://www.theguardian.com/tv-and-radio", section: entertainment, tags: [tv], weight: 1.2}
+  - {id: guardian-music, name: The Guardian — Music,         url: "https://www.theguardian.com/music/rss", home: "https://www.theguardian.com/music", section: entertainment, tags: [music], weight: 1.1}
+  - {id: bbc-arts,       name: BBC Entertainment & Arts,     url: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml", home: "https://www.bbc.com/news/entertainment_and_arts", section: entertainment, tags: [film, tv, music], weight: 1.1}
+  - {id: pitchfork,      name: Pitchfork — Reviews,          url: "https://pitchfork.com/feed/feed-album-reviews/rss", home: "https://pitchfork.com/reviews/albums/", section: entertainment, tags: [music], weight: 1.0}
+  - {id: avclub,         name: The A.V. Club,                url: "https://www.avclub.com/rss", home: "https://www.avclub.com", section: entertainment, tags: [film, tv], weight: 0.7}
+  - {id: variety,        name: Variety,                      url: "https://variety.com/feed/", home: "https://variety.com", section: entertainment, tags: [film, tv], weight: 0.8}
+  - {id: rollingstone,   name: Rolling Stone,                url: "https://www.rollingstone.com/feed/", home: "https://www.rollingstone.com", section: entertainment, tags: [music], weight: 0.8}
