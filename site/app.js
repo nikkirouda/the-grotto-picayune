@@ -29,8 +29,9 @@ let bundle = null;          // {items, weather, prefs, sources, generated}
 let prefs = null;           // effective preferences (bundle prefs + local edits)
 let votes = LS.get('votes', {});        // id -> {v:+1|-1, t:ms, s:source, tags:[...], tok:[...]}
 let read = LS.get('read', {});          // id -> ms
-let opts = Object.assign({ images: true, hideRead: true, hideSkipped: true, skipCounts: true, showHidden: false, compact: false, hideVideo: false, paperOnly: false, sort: 'score' }, LS.get('opts', {}));
-let skipped = LS.get('skipped', {});    // id -> ms: stories scrolled past (Captain's word 2026-11-21)
+let opts = Object.assign({ images: true, hideRead: true, showHidden: false, compact: false, hideVideo: false, paperOnly: false, sort: 'score' }, LS.get('opts', {}));
+// The scroll-past feature was tried and scrapped on 2026-11-21 (Captain's word); its marks are cleared below.
+LS.del('skipped'); delete opts.hideSkipped; delete opts.skipCounts;
 if (!opts.v2) { opts.hideRead = true; opts.v2 = true; LS.set('opts', opts); }   // Captain's word 2026-11-08: a read piece leaves the list
 let route = location.hash.replace(/^#\/?/, '').replace(/\/read$/, '') || 'foryou';
 let query = '';
@@ -93,14 +94,12 @@ function savePrefsLocal(patch) {
 }
 
 // ------------------------------------------------------------- learning (one method, kept here)
-// A scroll-past is half a thumbs-down (v -0.5, auto). It is learned separately, and its total pull on any one
-// story is capped at AUTO_CAP, below the hide threshold, so skimming alone can never hide anything; real votes can.
-const AUTO_CAP = 1.5;
 function rebuildModel() {
-  model = { src: {}, tag: {}, tok: {}, auto: { src: {}, tag: {}, tok: {} } };
+  model = { src: {}, tag: {}, tok: {} };
   for (const v of Object.values(votes)) {
-    const m = v.auto ? model.auto : model;
-    if (!v.auto) m.src[v.s] = (m.src[v.s] || 0) + v.v;   // a scroll-past says nothing about the source
+    if (v.auto) continue;                                  // a leftover scroll-past mark counts for nothing
+    const m = model;
+    m.src[v.s] = (m.src[v.s] || 0) + v.v;
     for (const t of v.tags || []) m.tag[t] = (m.tag[t] || 0) + v.v * 0.5;
     for (const k of v.tok || []) m.tok[k] = (m.tok[k] || 0) + v.v * 0.5;
   }
@@ -110,10 +109,7 @@ function learned(it) {
   const s = clip(model.src[it.source] || 0, 3);
   let tg = 0; for (const t of it.tags || []) tg += model.tag[t] || 0;
   let tk = 0; const hits = []; for (const k of it._tok) { const w = model.tok[k] || 0; if (w) { tk += w; hits.push([k, w]); } }
-  const A = model.auto || { src: {}, tag: {}, tok: {} };
-  let at = A.src[it.source] || 0; for (const t of it.tags || []) at += A.tag[t] || 0; for (const k of it._tok) at += A.tok[k] || 0;
-  const auto = Math.max(-AUTO_CAP, Math.min(0, at));
-  return { total: s + clip(tg, 3) + clip(tk, 3) + auto, s, tg: clip(tg, 3), tk: clip(tk, 3), hits, auto };
+  return { total: s + clip(tg, 3) + clip(tk, 3), s, tg: clip(tg, 3), tk: clip(tk, 3), hits };
 }
 function score(it) {
   const src = sourceById[it.source] || {};
@@ -135,7 +131,6 @@ function whyText(sc, it) {
   if (sc.boosts) bits.push(`${sc.boosts} boosted word${sc.boosts > 1 ? 's' : ''}`);
   if (sc.L.s) bits.push(`${sc.L.s > 0 ? '+' : ''}${sc.L.s.toFixed(1)} source`);
   if (sc.L.tg) bits.push(`${sc.L.tg > 0 ? '+' : ''}${sc.L.tg.toFixed(1)} topics`);
-  if (sc.L.auto && sc.L.auto <= -0.05) bits.push(`${sc.L.auto.toFixed(1)} scrolled past`);
   if (sc.L.hits.length) bits.push(sc.L.hits.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 2).map(([k, w]) => `${w > 0 ? '+' : ''}${w.toFixed(1)} “${k}”`).join(', '));
   return bits.join(' · ');
 }
@@ -228,7 +223,6 @@ function visibleItems() {
     const sc = score(it);
     if (!opts.showHidden && sc.L.total <= hideAt && !votes[it.id]) { hidden++; continue; }
     if (opts.hideRead && read[it.id] && !query) continue;      // read pieces leave the lists; search still finds them
-    if (opts.hideSkipped && skipped[it.id] && !read[it.id] && !query) continue;   // so do ones scrolled past
     if (opts.hideVideo && it.kind === 'video') continue;
     if (opts.paperOnly && !it.reader && !srcInfo.paywalled && !query && !canFetchOnTap(it)) continue;
     it._sc = sc;
@@ -246,7 +240,6 @@ function inSection(it, secs) {
 }
 function buildList() {
   if (pendingRefresh) hidePill();
-  if (skipObserver) skipObserver.disconnect();   // the old cards stop being watched before they go
   const { out, blocked, hidden } = visibleItems();
   let list = out;
   let title = 'For you';
@@ -292,38 +285,8 @@ function renderMore() {
   const lp = route.startsWith('place:') && (prefs.local_places || []).find(p => 'place:' + p.id === route);
   setStatus(currentList.length ? '' : lp ? `No story this week mentions ${lp.name.split(',')[0]}. The sources are the owner's list; ask them to add local ones for this place.` : 'Nothing here yet.');
 }
-// ------------------------------------------------------------- scrolled past (Captain's word 2026-11-21)
-// A card counts as scrolled past when at least 60% of it was on screen for 0.8 s and it then left by the top
-// of the screen, without being opened or voted on. Cards are never pulled out mid-scroll; they leave the list
-// at the next refresh. Search results are never counted.
-const cardItem = new WeakMap();
-const seenSince = new WeakMap(), seenEnough = new WeakSet();
-const skipObserver = ('IntersectionObserver' in window) ? new IntersectionObserver(entries => {
-  for (const e of entries) {
-    const n = e.target, it = cardItem.get(n); if (!it) continue;
-    // a card removed by a list rebuild also 'leaves' (with an empty box): that is not a scroll
-    if (!n.isConnected || e.boundingClientRect.height === 0) { seenSince.delete(n); continue; }
-    if (e.intersectionRatio >= 0.6) { if (!seenSince.has(n)) seenSince.set(n, Date.now()); continue; }
-    const since = seenSince.get(n); seenSince.delete(n);
-    if (since && Date.now() - since >= 800) seenEnough.add(n);
-    if (!e.isIntersecting && e.boundingClientRect.bottom <= 0 && seenEnough.has(n)) scrolledPast(it, n);
-  }
-}, { threshold: [0, 0.6] }) : null;
-function scrolledPast(it, n) {
-  if (query || readerItem || document.querySelector('.drawer.open') || read[it.id] || skipped[it.id] || votes[it.id]) return;
-  const forgot = LS.get('deletedVotes', {}); if (forgot[it.id]) return;   // just forgotten: not re-marked
-  skipped[it.id] = Date.now(); pruneSkipped(); LS.set('skipped', skipped);
-  if (opts.skipCounts) {
-    votes[it.id] = { v: -0.5, auto: true, t: Date.now(), s: it.source, tags: it.tags || [], tok: it._tok, title: it.title };
-    pruneAutoVotes(); LS.set('votes', votes); rebuildModel(); scheduleSync();
-  }
-  n.classList.add('skipped');
-}
-function pruneSkipped() { const cut = Date.now() - 21 * 864e5; for (const k in skipped) if (skipped[k] < cut) delete skipped[k]; }
-function pruneAutoVotes() { const cut = Date.now() - 30 * 864e5; for (const [k, v] of Object.entries(votes)) if (v.auto && v.t < cut) delete votes[k]; }
 function card(it, lead) {
   const n = $('#cardTpl').content.firstElementChild.cloneNode(true);
-  cardItem.set(n, it); if (skipObserver && !query) skipObserver.observe(n);
   n.dataset.id = it.id;
   if (lead) n.classList.add('lead');
   if (read[it.id]) n.classList.add('read');
@@ -361,7 +324,6 @@ function card(it, lead) {
 // is never overwritten; a scroll-past mark is.
 function markRead(it, n) {
   read[it.id] = Date.now(); pruneRead(); LS.set('read', read); n.classList.add('read');
-  if (skipped[it.id]) { delete skipped[it.id]; LS.set('skipped', skipped); }
   const v = votes[it.id];
   if (!v || v.auto) {
     votes[it.id] = { v: 1, opened: true, t: Date.now(), s: it.source, tags: it.tags || [], tok: it._tok, title: it.title };
@@ -840,7 +802,7 @@ function addTerm(key, inputEl) {
   savePrefsLocal(patch); inputEl.value = ''; fillTopics(); buildList();
 }
 function fillSettings() {
-  $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optHideSkipped').checked = opts.hideSkipped; $('#optSkipCounts').checked = opts.skipCounts; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact; $('#optHideVideo').checked = opts.hideVideo; $('#optPaperOnly').checked = opts.paperOnly;
+  $('#optImages').checked = opts.images; $('#optHideRead').checked = opts.hideRead; $('#optShowHidden').checked = opts.showHidden; $('#optCompact').checked = opts.compact; $('#optHideVideo').checked = opts.hideVideo; $('#optPaperOnly').checked = opts.paperOnly;
   $('#blockedTerms').value = (prefs.blocked_terms || []).join('\n'); $('#blockedCount').textContent = `(${(prefs.blocked_terms || []).length})`;
   $('#boostTerms').value = (prefs.boosted_terms || []).join('\n'); $('#boostCount').textContent = `(${(prefs.boosted_terms || []).length})`;
   $('#hideThreshold').value = prefs.hide_threshold ?? -2;
@@ -890,7 +852,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v16';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v17';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
@@ -904,6 +866,13 @@ async function checkForNewVersion() {
     const busy = readerItem || document.querySelector('.drawer.open') || !$('#welcome').classList.contains('hidden') || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName));
     if (newVersionWaiting && !busy && document.visibilityState === 'visible') location.reload();
   } catch {}
+}
+function purgeScrollPastMarks() {
+  const ids = Object.keys(votes).filter(id => votes[id] && votes[id].auto);
+  if (!ids.length) return;
+  const d = LS.get('deletedVotes', {}); const now = Date.now();
+  for (const id of ids) { delete votes[id]; d[id] = now; }
+  LS.set('deletedVotes', d); LS.set('votes', votes); rebuildModel(); scheduleSync();
 }
 function wireSettings() {
   $('#newPill').onclick = applyPending;
@@ -920,7 +889,7 @@ function wireSettings() {
   $('#addBoost').onsubmit = e => { e.preventDefault(); addTerm('boosted_terms', $('#addBoost input')); };
   $('#addBlock').onsubmit = e => { e.preventDefault(); addTerm('blocked_terms', $('#addBlock input')); };
   const opt = (id, key, after) => $(id).onchange = e => { opts[key] = e.target.checked; LS.set('opts', opts); document.body.classList.toggle('compact', opts.compact); buildList(); };
-  opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optHideSkipped', 'hideSkipped'); opt('#optSkipCounts', 'skipCounts'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact'); opt('#optHideVideo', 'hideVideo'); opt('#optPaperOnly', 'paperOnly');
+  opt('#optImages', 'images'); opt('#optHideRead', 'hideRead'); opt('#optShowHidden', 'showHidden'); opt('#optCompact', 'compact'); opt('#optHideVideo', 'hideVideo'); opt('#optPaperOnly', 'paperOnly');
   const lines = v => v.split('\n').map(x => x.trim()).filter(Boolean);
   $('#blockedTerms').onchange = e => { savePrefsLocal({ blocked_terms: lines(e.target.value) }); fillSettings(); buildList(); };
   $('#boostTerms').onchange = e => { savePrefsLocal({ boosted_terms: lines(e.target.value) }); fillSettings(); buildList(); };
@@ -931,8 +900,8 @@ function wireSettings() {
     if (!ids.length) { alert('No votes from today on this device.'); return; }
     if (!confirm(`Forget ${ids.length} vote${ids.length === 1 ? '' : 's'} from today (thumbs, opens and scroll-pasts)? Older votes stay.`)) return;
     const d = LS.get('deletedVotes', {}); const now = Date.now();
-    for (const id of ids) { delete votes[id]; d[id] = now; delete skipped[id]; }
-    LS.set('deletedVotes', d); LS.set('votes', votes); LS.set('skipped', skipped);
+    for (const id of ids) { delete votes[id]; d[id] = now; }
+    LS.set('deletedVotes', d); LS.set('votes', votes);
     rebuildModel(); fillLearned(); buildList(); scheduleSync();
     alert(LS.get('token', '') ? `Forgotten. Your other devices drop them at their next sync.` : `Forgotten on this device. Add your key here (or do this on a device that has it) so your other devices forget them too.`);
   };
@@ -1047,6 +1016,7 @@ async function rebuild() {
   wireSettings(); wireWelcome();
   window.addEventListener('hashchange', go);
   try { await loadBundle(); } catch (e) { setStatus('The news bundle is not here yet. The first build publishes it within a few minutes.'); console.error(e); return; }
+  purgeScrollPastMarks();
   countVisit(route);
   renderTabs(); buildList();
   if (!LS.get('welcomed', false) && !LS.get('prefsLocal', null) && !Object.keys(votes).length) openWelcome();
