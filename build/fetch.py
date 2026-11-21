@@ -209,8 +209,10 @@ def og_image(url):
     except Exception:
         return ""
 
-ARTICLE_VERSION = 4
-ALLOWED_TAGS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "strong", "em", "b", "i", "br", "img", "figure", "figcaption"}
+ARTICLE_VERSION = 5   # 5: tables kept (2026-11-21)
+ALLOWED_TAGS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "strong", "em", "b", "i", "br", "img", "figure", "figcaption",
+                "table", "thead", "tbody", "tr", "th", "td"}
+MAX_TABLE_ROWS, MAX_TABLE_COLS = 150, 10   # bigger than this is page furniture (stat dumps, layout grids), not the story
 BAD_IMG = re.compile(r"logo|icon|avatar|sprite|badge|pixel|1x1|spacer|placeholder|emoji|\.svg(\?|$)|/ads?/|doubleclick|gravatar", re.I)
 BAD_MEDIA = re.compile(r"\.(mp4|m3u8|flv|webm|mov|mp3)(\?|$)|/video/|hlsvod|/flv/", re.I)
 BAD_ZONE = re.compile(r"related|recommend|teaser|promo|sidebar|footer|nav|share|comment|newsletter|subscribe|trending|popular|most-read|cookie|banner|author|byline|widget", re.I)
@@ -366,6 +368,11 @@ def sanitize_article(html_text, base_url):
         return "", ""
     for bad in doc.xpath("//script|//style|//iframe|//form|//noscript|//h1|//object|//embed|//video|//audio|//svg"):
         bad.drop_tree()
+    for t in doc.xpath("//table"):
+        rows = t.xpath(".//tr")
+        cols = max((len(r.xpath("./td|./th")) for r in rows), default=0)
+        if t.xpath(".//table") or not rows or len(rows) > MAX_TABLE_ROWS or cols > MAX_TABLE_COLS or cols < 2:
+            t.drop_tree()
     for el in list(doc.iter()):
         if not isinstance(el.tag, str):
             continue
@@ -409,7 +416,7 @@ def _parse_article(url, title, summary, html_text):
     kind = story_kind(url, title, html_text)
     def attempt(precise):
         out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
-                                  include_comments=False, include_tables=False,
+                                  include_comments=False, include_tables=True,
                                   favor_precision=precise, favor_recall=not precise)
         if not out:
             return None, None, None, (False, "nothing extracted")
@@ -605,9 +612,9 @@ def main():
         if not os.path.exists(ap):
             return 0                      # never fetched
         rec = load_json(ap, {})
-        if rec.get("v", 1) >= ARTICLE_VERSION or rec.get("text"):
-            return 2                      # judged under the current rules, or already readable: leave it
-        return 1                          # rejected under older rules: try again when there is room
+        if rec.get("v", 1) >= ARTICLE_VERSION:
+            return 2                      # judged under the current rules: leave it
+        return 1                          # read or rejected under older rules: try again when there is room
     cands = [v for v in store["items"].values() if by_id.get(v["source"], {}).get("fulltext", True)
              and dt.datetime.fromisoformat(v["published"]) >= NOW - dt.timedelta(days=PUBLISH_DAYS)]
     cands = [(v, _article_state(v["id"])) for v in cands]
@@ -620,7 +627,15 @@ def main():
         with cf.ThreadPoolExecutor(max_workers=12) as ex:
             for rec, art in zip(want, ex.map(article_text, want)):
                 art = art or {"text": None, "why": "no page"}
-                with open(os.path.join(ARTICLES_DIR, rec["id"] + ".json"), "w", encoding="utf-8") as f:
+                ap_old = os.path.join(ARTICLES_DIR, rec["id"] + ".json")
+                old = load_json(ap_old, {}) if os.path.exists(ap_old) else {}
+                if old.get("text") and not art.get("text"):
+                    art = old                                   # keep the readable copy; just mark it as re-judged
+                elif old.get("text"):
+                    blob_old = os.path.join(os.path.dirname(STORE_PATH), "blobs", rec["id"] + ".bin")
+                    for b_ in (blob_old, blob_old[:-4] + ".json"):
+                        if os.path.exists(b_): os.remove(b_)    # the published file is rebuilt from the new copy
+                with open(ap_old, "w", encoding="utf-8") as f:
                     json.dump(dict(art, v=ARTICLE_VERSION, fetched=NOW.isoformat()), f, ensure_ascii=False)
                 if art.get("kind"):
                     rec["kind"] = art["kind"]
