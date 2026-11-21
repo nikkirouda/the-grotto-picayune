@@ -400,6 +400,61 @@ def sanitize_article(html_text, base_url):
     text = "\n\n".join(blocks) if blocks else " ".join(" ".join(body.itertext()).split())
     return inner, text
 
+# lxml/trafilatura are C code that crashed the build when several threads parsed at once ("double free or
+# corruption", 2026-11-21). Pages still download in parallel; only the parsing takes turns.
+import threading  # noqa: E402
+PARSE_LOCK = threading.Lock()
+
+def _parse_article(url, title, summary, html_text):
+    kind = story_kind(url, title, html_text)
+    def attempt(precise):
+        out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
+                                  include_comments=False, include_tables=False,
+                                  favor_precision=precise, favor_recall=not precise)
+        if not out:
+            return None, None, None, (False, "nothing extracted")
+        bh, tx = sanitize_article(out, url)
+        pars = clean_paragraphs(tx)
+        res = looks_like_the_story(pars, title, summary)
+        n_words = len(" ".join(pars).split())
+        if res[0] and bh.count("<img") > max(12, n_words / 40):
+            res = (False, "looks like a listing page (too many pictures for its text)")
+        return bh, tx, pars, res
+    body_html, text, paragraphs, (ok, why) = attempt(True)
+    if not ok and why in ("nothing extracted", "too short", "no real paragraphs"):
+        # some layouts (PBS NewsHour among them) defeat the precise pass; the generous one finds the story
+        b2, t2, p2, (ok2, why2) = attempt(False)
+        if ok2:
+            body_html, text, paragraphs, ok, why = b2, t2, p2, ok2, why2
+    if not ok:
+        return {"kind": kind, "text": None, "why": why}
+    # rebuild the html without the paragraphs we dropped
+    from lxml import html as LH
+    frag = LH.fragment_fromstring(body_html, create_parent="div")
+    keep = {re.sub(r"\W+", " ", p_.lower()).strip() for p_ in paragraphs}
+    for el in list(frag):
+        if el.tag in ("p", "h2", "h3", "h4", "li", "blockquote"):
+            k = re.sub(r"\W+", " ", " ".join(el.itertext()).lower()).strip()
+            if k and k not in keep:
+                el.drop_tree()
+    images = []
+    try:
+        images = page_images(LH.fromstring(html_text), url)
+    except Exception:
+        images = []
+    best = {_img_key(im["src"]): im["src"] for im in images}
+    for im in frag.iter("img"):
+        src = im.get("src", "")
+        k = _img_key(src)
+        if k in best:
+            im.set("src", best[k])            # the full-size version of the same picture
+        elif PLACEHOLDER_RE.search(src):
+            (im.getparent() if im.getparent() is not None and im.getparent().tag == "figure" else im).drop_tree()
+    body_html = "".join(LH.tostring(c, encoding="unicode") for c in frag)
+    inline_keys = {_img_key(u) for u in re.findall(r'src="([^"]+)"', body_html)}
+    images = [im for im in images if _img_key(im["src"]) not in inline_keys and not PLACEHOLDER_RE.search(im["src"])]
+    return {"html": body_html[:MAX_ARTICLE_CHARS * 2], "text": "\n\n".join(paragraphs)[:MAX_ARTICLE_CHARS], "images": images, "kind": kind}
+
 def article_text(rec):
     """Visit the story and return {'html','text','images','kind'} or None (with a reason in the log).
     The text must pass looks_like_the_story() before it is ever shown in the paper."""
@@ -413,54 +468,8 @@ def article_text(rec):
         if r.status_code != 200 or "html" not in r.headers.get("Content-Type", ""):
             return None
         html_text = r.raw.read(1_500_000, decode_content=True).decode(r.encoding or "utf-8", "ignore")
-        kind = story_kind(url, title, html_text)
-        def attempt(precise):
-            out = trafilatura.extract(html_text, url=url, output_format="html", include_images=True, include_links=False,
-                                      include_comments=False, include_tables=False,
-                                      favor_precision=precise, favor_recall=not precise)
-            if not out:
-                return None, None, None, (False, "nothing extracted")
-            bh, tx = sanitize_article(out, url)
-            pars = clean_paragraphs(tx)
-            res = looks_like_the_story(pars, title, summary)
-            n_words = len(" ".join(pars).split())
-            if res[0] and bh.count("<img") > max(12, n_words / 40):
-                res = (False, "looks like a listing page (too many pictures for its text)")
-            return bh, tx, pars, res
-        body_html, text, paragraphs, (ok, why) = attempt(True)
-        if not ok and why in ("nothing extracted", "too short", "no real paragraphs"):
-            # some layouts (PBS NewsHour among them) defeat the precise pass; the generous one finds the story
-            b2, t2, p2, (ok2, why2) = attempt(False)
-            if ok2:
-                body_html, text, paragraphs, ok, why = b2, t2, p2, ok2, why2
-        if not ok:
-            return {"kind": kind, "text": None, "why": why}
-        # rebuild the html without the paragraphs we dropped
-        from lxml import html as LH
-        frag = LH.fragment_fromstring(body_html, create_parent="div")
-        keep = {re.sub(r"\W+", " ", p_.lower()).strip() for p_ in paragraphs}
-        for el in list(frag):
-            if el.tag in ("p", "h2", "h3", "h4", "li", "blockquote"):
-                k = re.sub(r"\W+", " ", " ".join(el.itertext()).lower()).strip()
-                if k and k not in keep:
-                    el.drop_tree()
-        images = []
-        try:
-            images = page_images(LH.fromstring(html_text), url)
-        except Exception:
-            images = []
-        best = {_img_key(im["src"]): im["src"] for im in images}
-        for im in frag.iter("img"):
-            src = im.get("src", "")
-            k = _img_key(src)
-            if k in best:
-                im.set("src", best[k])            # the full-size version of the same picture
-            elif PLACEHOLDER_RE.search(src):
-                (im.getparent() if im.getparent() is not None and im.getparent().tag == "figure" else im).drop_tree()
-        body_html = "".join(LH.tostring(c, encoding="unicode") for c in frag)
-        inline_keys = {_img_key(u) for u in re.findall(r'src="([^"]+)"', body_html)}
-        images = [im for im in images if _img_key(im["src"]) not in inline_keys and not PLACEHOLDER_RE.search(im["src"])]
-        return {"html": body_html[:MAX_ARTICLE_CHARS * 2], "text": "\n\n".join(paragraphs)[:MAX_ARTICLE_CHARS], "images": images, "kind": kind}
+        with PARSE_LOCK:
+            return _parse_article(url, title, summary, html_text)
     except Exception:
         return None
 
