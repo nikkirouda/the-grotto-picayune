@@ -17,6 +17,8 @@ on:
         default: false
   push:
     branches: [main]
+    paths-ignore:
+      - private.enc     # a vote/preference sync saves this; it needs no fresh gathering (2026-11-21)
 
 permissions:
   contents: write           # the weekly heartbeat commit, and the one-time re-lock of private.enc
