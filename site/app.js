@@ -349,10 +349,20 @@ function card(it, lead) {
   };
   return n;
 }
+// Opening a story is a full thumbs-up (Captain's word 2026-11-21): he was interested in the topic, the source
+// or the headline. It shows as a lit 👍, so a mistaken tap is undone by tapping 👍 again. A vote he gave by hand
+// is never overwritten; a scroll-past mark is.
 function markRead(it, n) {
   read[it.id] = Date.now(); pruneRead(); LS.set('read', read); n.classList.add('read');
   if (skipped[it.id]) { delete skipped[it.id]; LS.set('skipped', skipped); }
-  if (votes[it.id] && votes[it.id].auto) { delete votes[it.id]; LS.set('votes', votes); rebuildModel(); scheduleSync(); }
+  const v = votes[it.id];
+  if (!v || v.auto) {
+    votes[it.id] = { v: 1, opened: true, t: Date.now(), s: it.source, tags: it.tags || [], tok: it._tok, title: it.title };
+    LS.set('votes', votes); rebuildModel(); scheduleSync();
+    const up = $('.up', n), down = $('.down', n);
+    if (up) up.classList.add('on'); if (down) down.classList.remove('on');
+    it._sc = score(it); const why = $('.why', n); if (why) why.textContent = whyText(it._sc, it);
+  }
 }
 async function openReader(it, n) {
   readerItem = it;
@@ -373,6 +383,8 @@ async function openReader(it, n) {
   // with no section in the address, '/read' alone would become a page path that does not exist; always use the hash
   if (!location.hash.endsWith('/read')) history.pushState({ reader: it.id }, '', (location.hash || '#/' + route) + '/read');
   if (n) markRead(it, n);
+  $('#readerUp').classList.toggle('on', !!votes[it.id] && votes[it.id].v > 0);
+  $('#readerDown').classList.toggle('on', !!votes[it.id] && !votes[it.id].auto && votes[it.id].v < 0);
   try {
     let text, art;
     if (!it.reader) art = await fetchOnTap(it);
@@ -859,7 +871,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v11';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v12';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
