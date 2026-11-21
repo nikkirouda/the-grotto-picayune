@@ -98,7 +98,7 @@ function rebuildModel() {
   model = { src: {}, tag: {}, tok: {}, auto: { src: {}, tag: {}, tok: {} } };
   for (const v of Object.values(votes)) {
     const m = v.auto ? model.auto : model;
-    m.src[v.s] = (m.src[v.s] || 0) + v.v;
+    if (!v.auto) m.src[v.s] = (m.src[v.s] || 0) + v.v;   // a scroll-past says nothing about the source
     for (const t of v.tags || []) m.tag[t] = (m.tag[t] || 0) + v.v * 0.5;
     for (const k of v.tok || []) m.tok[k] = (m.tok[k] || 0) + v.v * 0.5;
   }
@@ -243,6 +243,8 @@ function inSection(it, secs) {
   return false;
 }
 function buildList() {
+  if (pendingRefresh) hidePill();
+  if (skipObserver) skipObserver.disconnect();   // the old cards stop being watched before they go
   const { out, blocked, hidden } = visibleItems();
   let list = out;
   let title = 'For you';
@@ -297,6 +299,8 @@ const seenSince = new WeakMap(), seenEnough = new WeakSet();
 const skipObserver = ('IntersectionObserver' in window) ? new IntersectionObserver(entries => {
   for (const e of entries) {
     const n = e.target, it = cardItem.get(n); if (!it) continue;
+    // a card removed by a list rebuild also 'leaves' (with an empty box): that is not a scroll
+    if (!n.isConnected || e.boundingClientRect.height === 0) { seenSince.delete(n); continue; }
     if (e.intersectionRatio >= 0.6) { if (!seenSince.has(n)) seenSince.set(n, Date.now()); continue; }
     const since = seenSince.get(n); seenSince.delete(n);
     if (since && Date.now() - since >= 800) seenEnough.add(n);
@@ -304,7 +308,8 @@ const skipObserver = ('IntersectionObserver' in window) ? new IntersectionObserv
   }
 }, { threshold: [0, 0.6] }) : null;
 function scrolledPast(it, n) {
-  if (query || readerItem || read[it.id] || skipped[it.id] || votes[it.id]) return;
+  if (query || readerItem || document.querySelector('.drawer.open') || read[it.id] || skipped[it.id] || votes[it.id]) return;
+  const forgot = LS.get('deletedVotes', {}); if (forgot[it.id]) return;   // just forgotten: not re-marked
   skipped[it.id] = Date.now(); pruneSkipped(); LS.set('skipped', skipped);
   if (opts.skipCounts) {
     votes[it.id] = { v: -0.5, auto: true, t: Date.now(), s: it.source, tags: it.tags || [], tok: it._tok, title: it.title };
@@ -553,6 +558,18 @@ function flash(t, ms = 5000) { setStatus(t); clearTimeout(flashTimer); flashTime
 // the new edition and slides it in. A fresh gathering takes two to three minutes. Devices without the token
 // (friends) read the latest edition and can pull in a newer one with ↻, but cannot start a gathering.
 let lastCheck = 0, gathering = false, pollTimer = null;
+// The list never rearranges itself while he is reading (Captain's report 2026-11-21: "the stories shown keep
+// changing without me doing anything"). Background changes rebuild it only at the very top of the page;
+// otherwise a "New stories · Show" pill waits for his tap.
+let pendingRefresh = false;
+function softRefresh(label) {
+  if (window.scrollY < 80 && !readerItem && !query) { buildList(); hidePill(); return; }
+  pendingRefresh = true;
+  const pill = $('#newPill'); $('#newPillText').textContent = label || 'New stories';
+  pill.classList.remove('hidden');
+}
+function hidePill() { pendingRefresh = false; $('#newPill').classList.add('hidden'); }
+function applyPending() { hidePill(); window.scrollTo(0, 0); buildList(); }
 const buildAgeMin = () => (Date.now() - new Date(manifest.generated || 0).getTime()) / 60000;
 async function pullNewer() {
   const mf = await fetch('data/manifest.json', { cache: 'no-store' }).then(r => r.json());
@@ -560,8 +577,7 @@ async function pullNewer() {
   const had = new Set(bundle.items.map(i => i.id));
   await loadBundle();
   const fresh = bundle.items.filter(i => !had.has(i.id)).length;
-  renderTabs(); buildList();
-  flash(`Fresh edition: ${fresh} new stor${fresh === 1 ? 'y' : 'ies'}.`);
+  renderTabs(); softRefresh(fresh ? `${fresh} new stor${fresh === 1 ? 'y' : 'ies'}` : 'Fresh edition');
   return true;
 }
 async function gather(manual) {
@@ -871,7 +887,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v12';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v14';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
@@ -887,6 +903,7 @@ async function checkForNewVersion() {
   } catch {}
 }
 function wireSettings() {
+  $('#newPill').onclick = applyPending;
   $('#sizeDown').onclick = () => stepReaderSize(-1);
   $('#sizeUp').onclick = () => stepReaderSize(+1);
   applyReaderSize();
@@ -905,6 +922,17 @@ function wireSettings() {
   $('#blockedTerms').onchange = e => { savePrefsLocal({ blocked_terms: lines(e.target.value) }); fillSettings(); buildList(); };
   $('#boostTerms').onchange = e => { savePrefsLocal({ boosted_terms: lines(e.target.value) }); fillSettings(); buildList(); };
   $('#hideThreshold').onchange = e => { savePrefsLocal({ hide_threshold: parseFloat(e.target.value) }); buildList(); };
+  $('#forgetToday').onclick = () => {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const ids = Object.keys(votes).filter(id => (votes[id].t || 0) >= start.getTime());
+    if (!ids.length) { alert('No votes from today on this device.'); return; }
+    if (!confirm(`Forget ${ids.length} vote${ids.length === 1 ? '' : 's'} from today (thumbs, opens and scroll-pasts)? Older votes stay.`)) return;
+    const d = LS.get('deletedVotes', {}); const now = Date.now();
+    for (const id of ids) { delete votes[id]; d[id] = now; delete skipped[id]; }
+    LS.set('deletedVotes', d); LS.set('votes', votes); LS.set('skipped', skipped);
+    rebuildModel(); fillLearned(); buildList(); scheduleSync();
+    alert(LS.get('token', '') ? `Forgotten. Your other devices drop them at their next sync.` : `Forgotten on this device. Add your key here (or do this on a device that has it) so your other devices forget them too.`);
+  };
   $('#resetVotes').onclick = () => { if (confirm('Forget every like and dislike?')) { votes = {}; LS.set('votes', votes); rebuildModel(); fillLearned(); buildList(); scheduleSync(); } };
   $('#repo').onchange = e => LS.set('repo', e.target.value.trim());
   $('#token').onchange = e => {
@@ -960,6 +988,7 @@ async function sync(manual) {
   const msg = t => { $('#syncMsg').textContent = t; };
   try {
     // Your private file has its own key (security review 2026-11-09): friends' paper passphrase can't open it.
+    const prefsBefore = JSON.stringify(prefs);
     let own = LS.get('ownerPass', null);
     if (!own) { const d = $('#ownPass').closest('details'); if (d) d.open = true; throw new Error('Sync needs your own passphrase: type it in the box above and tap Check it.'); }
     msg('Syncing…');
@@ -978,7 +1007,8 @@ async function sync(manual) {
     const merged = Object.assign({}, fb.votes || {});
     const deleted = new Set(fb.deleted || []);
     const localDel = LS.get('deletedVotes', {});
-    for (const [id, v] of Object.entries(votes)) if (!merged[id] || (merged[id].t || 0) < (v.t || 0)) merged[id] = v;
+    const deletedAt = fb.updatedMs || 0;   // a vote forgotten elsewhere stays forgotten unless cast again since
+    for (const [id, v] of Object.entries(votes)) { if (deleted.has(id) && (v.t || 0) <= deletedAt && !merged[id]) continue; if (!merged[id] || (merged[id].t || 0) < (v.t || 0)) merged[id] = v; }
     for (const [id, t] of Object.entries(localDel)) if (merged[id] && (merged[id].t || 0) <= t) { delete merged[id]; deleted.add(id); }
     const votesChanged = JSON.stringify(merged) !== JSON.stringify(fb.votes || {});
     votes = merged; LS.set('votes', votes); LS.del('deletedVotes'); rebuildModel();
@@ -990,14 +1020,15 @@ async function sync(manual) {
     bundle.prefs = priv.preferences; if (!prefsChanged) LS.del('prefsLocal');
     prefs = effectivePrefs(); compilePrefs();
     if (votesChanged || prefsChanged) {
-      priv.feedback = { votes: merged, deleted: Array.from(deleted).slice(-500), updated: new Date().toISOString(), updatedMs: Date.now() };
+      priv.feedback = { votes: merged, deleted: Array.from(deleted).slice(-3000), updated: new Date().toISOString(), updatedMs: Date.now() };
       const blob = await encrypt(new TextEncoder().encode(JSON.stringify(priv, null, 1)), pass);
       await gh('contents/private.enc', { method: 'PUT', body: JSON.stringify({ message: 'private: sync from the site', content: bytesToB64(blob), sha: pf.sha }) });
     }
     if (prefsChanged) LS.del('prefsLocal');
     LS.set('lastSync', Date.now());
     msg(`Synced ${new Date().toLocaleTimeString()}${votesChanged || prefsChanged ? ' (saved to the repository; the next build uses it)' : ''}.`);
-    fillSettings(); buildList();
+    fillSettings();
+    if (prefsBefore !== JSON.stringify(prefs)) softRefresh('Your settings from another device');
   } catch (e) { msg(e.message); if (manual) console.error(e); }
 }
 async function rebuild() {
