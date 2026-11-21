@@ -510,7 +510,7 @@ function renderArticle(it, art, text) {
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
 }
 function imgKey(u) { try { const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }
-const READER_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'STRONG', 'EM', 'B', 'I', 'BR', 'IMG', 'FIGURE', 'FIGCAPTION']);
+const READER_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'STRONG', 'EM', 'B', 'I', 'BR', 'IMG', 'FIGURE', 'FIGCAPTION', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD']);
 function sanitizeArticle(htmlText, hero) {
   // The build already cleaned this; a second pass costs nothing and keeps the page honest about what it renders.
   const doc = new DOMParser().parseFromString(htmlText, 'text/html');
@@ -530,6 +530,7 @@ function sanitizeArticle(htmlText, hero) {
     }
   };
   walk(doc.body);
+  for (const t of Array.from(doc.body.querySelectorAll('table'))) { const w = doc.createElement('div'); w.className = 'table-wrap'; t.replaceWith(w); w.appendChild(t); }
   for (const el of Array.from(doc.body.querySelectorAll('p, li, h2, h3, h4'))) if (!el.textContent.trim() && !el.querySelector('img')) el.remove();
   return doc.body.innerHTML;
 }
@@ -887,7 +888,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v14';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v15';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
