@@ -50,7 +50,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 function termRegex(terms) {
   const t = (terms || []).map(x => x.trim()).filter(Boolean);
   if (!t.length) return null;
-  const parts = t.map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+  const parts = t.map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+').replace(/['’‘]/g, "['’‘]"));
   // word boundaries that also work next to punctuation/apostrophes
   return new RegExp('(?<![\\w])(?:' + parts.join('|') + ')(?![\\w])', 'i');
 }
@@ -793,12 +793,14 @@ function fillTopics() {
   $('#topicsNote').textContent = LS.get('token', '') ? 'Changes save to the paper and reach your other devices at the next sync.' : 'Saved on this device. To carry these to your other devices, add a token in Settings → Sync.';
 }
 function addTerm(key, inputEl) {
-  const t = inputEl.value.trim().replace(/\s+/g, ' ');
-  if (!t) return;
+  // one word or phrase, or several separated by commas
+  const terms = inputEl.value.split(/[,\n]/).map(x => x.trim().replace(/\s+/g, ' ')).filter(Boolean);
+  if (!terms.length) return;
   const other = key === 'boosted_terms' ? 'blocked_terms' : 'boosted_terms';
-  const list = (prefs[key] || []).filter(x => x.toLowerCase() !== t.toLowerCase());
-  const patch = { [key]: [...list, t] };
-  if ((prefs[other] || []).some(x => x.toLowerCase() === t.toLowerCase())) patch[other] = (prefs[other] || []).filter(x => x.toLowerCase() !== t.toLowerCase());
+  const low = new Set(terms.map(x => x.toLowerCase()));
+  const list = (prefs[key] || []).filter(x => !low.has(x.toLowerCase()));
+  const patch = { [key]: [...list, ...terms] };
+  if ((prefs[other] || []).some(x => low.has(x.toLowerCase()))) patch[other] = (prefs[other] || []).filter(x => !low.has(x.toLowerCase()));
   savePrefsLocal(patch); inputEl.value = ''; fillTopics(); buildList();
 }
 function fillSettings() {
@@ -852,7 +854,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v17';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v18';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
