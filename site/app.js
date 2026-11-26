@@ -454,7 +454,7 @@ async function fetchOnTap(it, fresh) {
 }
 function renderArticle(it, art, text) {
     const hero = it.image ? imgKey(it.image) : null;
-    $('#readerText').innerHTML = art.html ? sanitizeArticle(art.html, hero) : text.split(/\n{1,}/).map(par => par.trim()).filter(Boolean).map(par => par.length < 80 && !/[.!?]$/.test(par) ? `<h3>${esc(par)}</h3>` : `<p>${esc(par)}</p>`).join('');
+    $('#readerText').innerHTML = art.html ? sanitizeArticle(art.html, hero, it.title) : text.split(/\n{1,}/).map(par => par.trim()).filter(Boolean).map(par => par.length < 80 && !/[.!?]$/.test(par) ? `<h3>${esc(par)}</h3>` : `<p>${esc(par)}</p>`).join('');
     const extra = (art.images || []).filter(im => opts.images && imgKey(im.src) !== hero);
     if (extra.length) {
       $('#readerText').insertAdjacentHTML('beforeend', `<div class="gallery"><h3>More pictures from the story</h3>${extra.map(im => `<figure><img src="${esc(im.src)}" alt="${esc(im.alt)}" loading="lazy" referrerpolicy="no-referrer"><figcaption>${esc(im.caption || im.alt)}</figcaption></figure>`).join('')}</div>`);
@@ -473,9 +473,9 @@ function renderArticle(it, art, text) {
     if (first && (first.tagName === 'IMG' || first.tagName === 'FIGURE' || (first.firstElementChild && first.firstElementChild.tagName === 'IMG' && !first.textContent.trim()))) $('#readerImg').classList.add('hidden');
     $('#readerFoot').textContent = `Fetched from ${it._src} for your reading only. Charts, videos and anything shown as a graphic stay at the source.`;
 }
-function imgKey(u) { try { const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }
+function imgKey(u) { try { let d = u; try { d = decodeURIComponent(u); } catch {} const at = [...d.matchAll(/https?:\/\//g)].map(m => m.index); if (at.length > 1) u = d.slice(at[at.length - 1]); const p = new URL(u); const path = p.pathname.replace(/(\.(jpe?g|png|webp|avif|gif))+$/i, ''); return (p.hostname.replace(/^www\./, '') + path.replace(/[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$/g, '')).toLowerCase(); } catch { return u; } }
 const READER_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'STRONG', 'EM', 'B', 'I', 'BR', 'IMG', 'FIGURE', 'FIGCAPTION', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD']);
-function sanitizeArticle(htmlText, hero) {
+function sanitizeArticle(htmlText, hero, title) {
   // The build already cleaned this; a second pass costs nothing and keeps the page honest about what it renders.
   const doc = new DOMParser().parseFromString(htmlText, 'text/html');
   const walk = node => {
@@ -495,6 +495,17 @@ function sanitizeArticle(htmlText, hero) {
   };
   walk(doc.body);
   for (const t of Array.from(doc.body.querySelectorAll('table'))) { const w = doc.createElement('div'); w.className = 'table-wrap'; t.replaceWith(w); w.appendChild(t); }
+  // page furniture the extractor mistakes for story: the headline again, a lone byline ("Story by", "By ...")
+  const norm = x => (x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const nt = norm(title);
+  for (const el of Array.from(doc.body.querySelectorAll('p, li, h2, h3, h4'))) {
+    const t = el.textContent.trim();
+    if ((nt && norm(t) === nt) || /^(story|written|words) by\b/i.test(t) && t.split(/\s+/).length <= 6 || /^[Bb]y\s+[A-Z][\w'’.-]+(\s+[A-Z][\w'’.-]+){0,3}$/.test(t)) el.remove();
+  }
+  for (const l of Array.from(doc.body.querySelectorAll('ul, ol'))) if (!l.querySelector('li')) l.remove();
+  // the same picture twice in a row (or anywhere) shows once
+  const seenImg = new Set();
+  for (const im of Array.from(doc.body.querySelectorAll('img'))) { const k = imgKey(im.getAttribute('src') || ''); if (seenImg.has(k)) (im.closest('figure') || im).remove(); else seenImg.add(k); }
   for (const el of Array.from(doc.body.querySelectorAll('p, li, h2, h3, h4'))) if (!el.textContent.trim() && !el.querySelector('img')) el.remove();
   return doc.body.innerHTML;
 }
@@ -854,7 +865,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v18';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v19';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
