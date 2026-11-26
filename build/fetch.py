@@ -289,8 +289,14 @@ def _biggest_from_srcset(srcset):
     return best
 
 def _img_key(u):
-    """Loose identity for an image URL: host+path without size/query noise."""
+    """Loose identity for an image URL: host+path without size/query noise. A resizing service that wraps the
+    original address (Yahoo's s.yimg.com/.../https%3A%2F%2Fmedia.zenfs.com/...) is unwrapped first (2026-11-26)."""
     try:
+        from urllib.parse import unquote
+        d = unquote(u)
+        inner = [m.start() for m in re.finditer(r"https?://", d)]
+        if len(inner) > 1:
+            u = d[inner[-1]:]
         p = urlparse(u)
         path = re.sub(r"(\.(jpe?g|png|webp|avif|gif))+$", "", p.path, flags=re.I)
         return (p.netloc.lower().replace("www.", "") + re.sub(r"[-_/]\d{2,4}x\d{2,4}|[-_]\d{3,4}$", "", path)).lower()
