@@ -1,10 +1,14 @@
 name: build
-# Gathers the sources once a day before dawn (Captain's word 2026-11-09), on request from the paper (a device
+# Gathers the sources before dawn (three tries; Captain's word 2026-11-09, retimed 2026-11-27), on request from the paper (a device
 # holding the owner's key opens it or taps ↻, in quick mode), and on every push. The 14-day archive lives in
 # the Actions cache.
 on:
   schedule:
-    - cron: "0 8 * * *"        # 3 AM Eastern in winter, 4 AM in summer
+    # GitHub started the old on-the-hour 3 AM run 7-10 hours late most days (Nov 2026); runs on the hour are the
+    # most delayed. Three off-the-hour tries, so at least one edition lands before breakfast (Eastern, winter):
+    - cron: "17 6 * * *"       # 1:17 AM
+    - cron: "23 8 * * *"       # 3:23 AM
+    - cron: "41 10 * * *"      # 5:41 AM
   workflow_dispatch:
     inputs:
       quick:
