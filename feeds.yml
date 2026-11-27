@@ -1,5 +1,6 @@
 # Public source list — every source is free to read, no login, no subscription.
 # Fields: id, name, url (RSS/Atom), home, section, tags (list), weight (0.5–1.5, default 1), place (optional),
+#         skip_categories (optional: feed categories to leave out, whole-word, e.g. [NBA]),
 #         fulltext (default true; false = never fetch this source's story text for the in-app reader)
 # Sources for private places live in private.enc (see README) and are merged in at build time.
 # Checked live 2026-11-07. No religious or religion-affiliated outlets (Captain's word 2026-11-09).
@@ -125,7 +126,8 @@ sources:
   # ---- Football, the whole league; and Fantasy Football on its own (Captain's word 2026-11-07) ----
   - {id: cbs-nfl,      name: CBS Sports NFL,              url: "https://www.cbssports.com/rss/headlines/nfl/", home: "https://www.cbssports.com/nfl/", section: football, tags: [nfl], weight: 1.2}
   - {id: yahoo-nfl,    name: Yahoo Sports NFL,            url: "https://sports.yahoo.com/nfl/rss/", home: "https://sports.yahoo.com/nfl/", section: football, tags: [nfl], weight: 0.8}
-  - {id: pfn,          name: Pro Football Network,        url: "https://www.profootballnetwork.com/feed/", home: "https://www.profootballnetwork.com", section: football, tags: [nfl], weight: 0.7}
+  # Pro Football Network also covers other sports; its stories carry categories, and these are skipped (2026-11-27)
+  - {id: pfn,          name: Pro Football Network,        url: "https://www.profootballnetwork.com/feed/", home: "https://www.profootballnetwork.com", section: football, tags: [nfl], weight: 0.7, skip_categories: [NBA, WNBA, MLB, NHL, College Basketball, Soccer]}
   - {id: yahoo-fantasy, name: Yahoo Fantasy Football,     url: "https://sports.yahoo.com/fantasy/rss/", home: "https://sports.yahoo.com/fantasy/football/", section: fantasy, tags: [fantasy, nfl], weight: 0.8}
   - {id: fftoday,      name: FFToday,                     url: "https://www.fftoday.com/rss/news.xml", home: "https://www.fftoday.com", section: fantasy, tags: [fantasy, nfl], weight: 0.9}
   - {id: 4for4,        name: 4for4,                       url: "https://www.4for4.com/rss.xml", home: "https://www.4for4.com", section: fantasy, tags: [fantasy, nfl], weight: 0.9}
