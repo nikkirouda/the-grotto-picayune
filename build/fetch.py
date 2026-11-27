@@ -138,6 +138,11 @@ def abs_url(base, u):
     return u
 
 # ---------------------------------------------------------------- fetching
+def cats_match(cats, words):
+    """True when any feed category contains one of the words as a whole word ("NBA" matches "NBA Trends")."""
+    pat = re.compile(r"(?<![\w])(?:" + "|".join(re.escape(w) for w in words) + r")(?![\w])", re.I)
+    return any(pat.search(c) for c in cats)
+
 def fetch_source(src, http_cache):
     sid = src["id"]
     headers = {"User-Agent": UA, "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8"}
@@ -158,11 +163,15 @@ def fetch_source(src, http_cache):
     feed = feedparser.parse(r.content)
     new_cache = {"etag": r.headers.get("ETag"), "last_modified": r.headers.get("Last-Modified"), "checked": NOW.isoformat()}
     items = []
+    skip = src.get("skip_categories") or []
     for e in feed.entries:
         link = e.get("link") or ""
         title = clean_text(e.get("title", ""))
         if not link or not title:
             continue
+        cats = [t.get("term", "") for t in (e.get("tags") or []) if t.get("term")]
+        if skip and cats_match(cats, skip):
+            continue                       # e.g. Pro Football Network's "NBA Trends" (Captain's word 2026-11-27)
         when = entry_time(e)
         summary = ""
         for c in e.get("content", []) or []:
@@ -189,6 +198,7 @@ def fetch_source(src, http_cache):
             "image": img,
             "published": when.isoformat() if when else None,
             "source": sid,
+            "cats": cats[:12],
         })
     return sid, items, f"ok {len(items)}", time.time() - t0, new_cache
 
@@ -580,6 +590,7 @@ def main():
                 old["title"] = it["title"] or old["title"]
                 old["summary"] = it["summary"] or old["summary"]
                 old["image"] = old.get("image") or it["image"]
+                if it.get("cats"): old["cats"] = it["cats"]
                 if pub and not old.get("published"):
                     old["published"] = pub
                 continue
@@ -589,6 +600,7 @@ def main():
                 "published": pub or NOW.isoformat(), "seen": NOW.isoformat(), "source": sid,
                 "section": src["section"], "tags": sorted(set(src.get("tags", []) + ([src["place"]] if src.get("place") else []))),
                 "place": src.get("place"),
+                "cats": it.get("cats") or [],
             }
             store["items"][iid] = rec
             new_ids.append(iid)
@@ -693,7 +705,8 @@ def main():
     #    from the same preferences, so an edit there takes effect without a rebuild)
     muted = set(prefs.get("muted_sources", []))
     pub_cutoff = NOW - dt.timedelta(days=PUBLISH_DAYS)
-    items = [v for v in store["items"].values() if v["source"] not in muted and v["source"] in by_id and dt.datetime.fromisoformat(v["published"]) >= pub_cutoff]
+    items = [v for v in store["items"].values() if v["source"] not in muted and v["source"] in by_id and dt.datetime.fromisoformat(v["published"]) >= pub_cutoff
+             and not (by_id[v["source"]].get("skip_categories") and cats_match(v.get("cats") or [], by_id[v["source"]]["skip_categories"]))]
     # collapse the same story from several sources
     seen_titles = {}
     for v in sorted(items, key=lambda r: by_id.get(r["source"], {}).get("weight", 1), reverse=True):
