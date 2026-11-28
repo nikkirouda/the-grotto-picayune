@@ -49,7 +49,7 @@ function hub() {
     ${card('#typecase', 'T', 'Type Case', 'Seven letters in the tray. How many words can you set?', st('tc', x => x.found.length ? `${x.found.length} word${x.found.length === 1 ? '' : 's'}` : ''))}
     ${card('#columns', '▥', 'Four Columns', 'Sixteen words, four hidden groups.', st('fc', x => x.over ? (x.solved.length === 4 ? 'solved' : 'played') : ''))}
     ${card('#crossword', '▦', 'The Crossword', 'A small grid: three across, three down.', st('xw', x => x.over ? (x.revealed ? 'shown' : 'solved') : ''))}
-    ${card('#dateline', '⏳', 'Dateline', 'Six events from history, to put in order.', st('dl', x => x.over ? 'played' : ''))}
+    ${card('#dateline', '⏳', 'Dateline', 'Ten events from history, to put in order.', st('dl', x => x.over ? 'played' : ''))}
     ${card('#quiz', '?', 'The Quiz', 'Six questions, one from each category.', st('qz', x => x.picks.length >= 6 ? 'played' : ''))}
     </div>
     <h3>From elsewhere · free</h3>
@@ -262,30 +262,32 @@ async function crossword() {
   draw();
 }
 
-// ------------------------------------------------------------------ Dateline (put six events in order)
+// ------------------------------------------------------------------ Dateline (put ten events in order)
 async function dateline() {
+  const N = 10, CHECKS = 4;   // ten events, four checks (Captain's word 2026-11-28)
   frame('Dateline');
   const data = await load('timeline'); const n = dayNo(data.start);
-  const picks = shuffle(data.events.map((_, i) => i), 1000 + n).slice(0, 6);
+  const picks = shuffle(data.events.map((_, i) => i), 1000 + n).slice(0, N);
   const right = picks.slice().sort((a, b) => data.events[a][0] - data.events[b][0]);
   let start = shuffle(picks, 77 + n); if (start.join() === right.join()) start = start.reverse();
-  const st = LS.get('dl:' + todayKey(), { order: start, checks: 0, over: false });
-  $('#main').innerHTML = `<p class="howto">Put these six events in order, earliest at the top. You have three checks; each shows which ones are in the right place.</p>
+  let st = LS.get('dl:' + todayKey(), null);
+  if (!st || st.order.length !== N) st = { order: start, checks: 0, over: false };
+  $('#main').innerHTML = `<p class="howto">Put these ten events in order, earliest at the top. You have four checks; each shows which ones are in the right place.</p>
     <div id="dlList" class="dl-list"></div><div class="msg" id="dlMsg"></div>
     <div class="row"><button class="btn" id="dlCheck">Check the order</button></div>`;
   let marks = null;
   const say = t => { $('#dlMsg').textContent = t; };
   const draw = () => {
     $('#dlList').innerHTML = st.order.map((id, i) => { const ok = st.over || marks ? id === right[i] : null;
-      return `<div class="dl-item ${ok === true ? 'ok' : ok === false ? 'no' : ''}"><span class="dl-year">${st.over ? data.events[id][0] : (i + 1)}</span><span class="dl-text">${esc(data.events[id][1])}</span>${st.over ? '' : `<span class="dl-move"><button data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move earlier">▲</button><button data-i="${i}" data-d="1" ${i === 5 ? 'disabled' : ''} aria-label="Move later">▼</button></span>`}</div>`; }).join('');
+      return `<div class="dl-item ${ok === true ? 'ok' : ok === false ? 'no' : ''}"><span class="dl-year">${st.over ? data.events[id][0] : (i + 1)}</span><span class="dl-text">${esc(data.events[id][1])}</span>${st.over ? '' : `<span class="dl-move"><button data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move earlier">▲</button><button data-i="${i}" data-d="1" ${i === N - 1 ? 'disabled' : ''} aria-label="Move later">▼</button></span>`}</div>`; }).join('');
     $('#dlCheck').disabled = st.over;
     if (st.over) { const good = st.order.filter((id, i) => id === right[i]).length;
-      if (good < 6) $('#dlList').insertAdjacentHTML('beforeend', `<p class="howto" style="margin-top:14px">The right order:</p>` + right.map(id => `<div class="dl-item ok"><span class="dl-year">${data.events[id][0]}</span><span class="dl-text">${esc(data.events[id][1])}</span></div>`).join(''));
-      say(good === 6 ? `All six in order, with ${st.checks} check${st.checks === 1 ? '' : 's'}. More tomorrow.` : `${good} of 6 in the right place. More tomorrow.`); }
-    else $('#dlCheck').textContent = `Check the order (${3 - st.checks} left)`;
+      if (good < N) $('#dlList').insertAdjacentHTML('beforeend', `<p class="howto" style="margin-top:14px">The right order:</p>` + right.map(id => `<div class="dl-item ok"><span class="dl-year">${data.events[id][0]}</span><span class="dl-text">${esc(data.events[id][1])}</span></div>`).join(''));
+      say(good === N ? `All ten in order, with ${st.checks} check${st.checks === 1 ? '' : 's'}. More tomorrow.` : `${good} of ${N} in the right place. More tomorrow.`); }
+    else $('#dlCheck').textContent = `Check the order (${CHECKS - st.checks} left)`;
   };
   $('#dlList').onclick = e => { const b = e.target.closest('button'); if (!b || st.over) return; const i = +b.dataset.i, j = i + (+b.dataset.d); [st.order[i], st.order[j]] = [st.order[j], st.order[i]]; marks = null; say(''); LS.set('dl:' + todayKey(), st); draw(); };
-  $('#dlCheck').onclick = () => { st.checks++; marks = true; const good = st.order.filter((id, i) => id === right[i]).length; if (good === 6 || st.checks >= 3) st.over = true; else say(`${good} of 6 in the right place.`); LS.set('dl:' + todayKey(), st); draw(); };
+  $('#dlCheck').onclick = () => { st.checks++; marks = true; const good = st.order.filter((id, i) => id === right[i]).length; if (good === N || st.checks >= CHECKS) st.over = true; else say(`${good} of ${N} in the right place.`); LS.set('dl:' + todayKey(), st); draw(); };
   keyHandler = null; draw();
 }
 
