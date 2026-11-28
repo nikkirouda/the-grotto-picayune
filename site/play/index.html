@@ -55,6 +55,20 @@
   .fc-solved.missed { opacity: .7; border-style: dashed; }
   .slips { text-align: center; color: var(--muted); font-size: .9rem; margin-top: 10px; letter-spacing: .1em; }
 
+  /* Stop Press */
+  .sp-sheet { max-width: 330px; margin: 0 auto; font-family: var(--font); }
+  .sp-line { display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--line); padding: 5px 0; }
+  .sp-no { color: var(--muted); font-size: .8rem; width: 18px; font-family: var(--sans); }
+  .sp-cell { flex: 1; height: 46px; display: grid; place-items: center; font-size: 1.6rem; font-weight: 700; text-transform: uppercase; border-radius: 6px; }
+  .sp-cell.set, .sp-key.set, .sp-kb button.set { background: var(--accent); color: var(--accent-ink); }
+  .sp-cell.move, .sp-key.move, .sp-kb button.move { box-shadow: inset 0 0 0 3px var(--gold); border-radius: 50%; color: var(--ink); background: transparent; }
+  .sp-cell.struck, .sp-key.struck, .sp-kb button.struck { color: var(--muted); text-decoration: line-through; opacity: .6; }
+  .sp-key { display: inline-block; padding: 0 7px; border-radius: 5px; font-weight: 600; } .sp-key.move { border-radius: 99px; }
+  .sp-kb { margin-top: 10px; } .sp-kb div { display: flex; justify-content: center; gap: 4px; margin-bottom: 5px; }
+  .sp-kb button { flex: 1; max-width: 40px; height: 48px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); font-size: 1rem; text-transform: uppercase; padding: 0; }
+  .sp-kb button.wide { max-width: 62px; flex: 1.6; font-size: .8rem; text-transform: none; }
+  .sp-kb button.move { border-radius: 99px; }
+
   /* embedded games */
   .embed { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; }
   .embed iframe { flex: 1; border: 0; width: 100%; background: #fff; }
