@@ -9,6 +9,9 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem('picayune:play:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem('picayune:play:' + k, JSON.stringify(v)); } catch {} },
 };
+// The styles travel with this file: whatever copy of the page the browser kept, the right stylesheet is loaded.
+const PLAY_V = 25;
+if (!document.querySelector(`link[href="play.css?v=${PLAY_V}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = `play.css?v=${PLAY_V}`; document.head.appendChild(l); document.querySelectorAll('style').forEach(x => x.remove()); }
 try { const t = JSON.parse(localStorage.getItem('picayune:theme')); if (t) document.documentElement.dataset.theme = t; } catch {}
 
 // Other people's games. embed: true only where the site sends no frame-blocking header (checked 2026-11-28).
@@ -36,19 +39,22 @@ function frame(title, own) {
 // ------------------------------------------------------------------ hub
 function hub() {
   frame('Puzzles');
-  const tc = LS.get('tc:' + todayKey(), null), fc = LS.get('fc:' + todayKey(), null), sp = LS.get('sp:' + todayKey(), null);
-  const card = (href, icon, name, d, done, ext) => `<a class="game-card" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener noreferrer"' : ''}><span class="gi">${icon}</span><span><b>${esc(name)}</b><span class="d">${esc(d)}</span></span>${done ? `<span class="done">${esc(done)}</span>` : ''}</a>`;
+  const card = (href, icon, name, d, done, ext, shelf) => `<a class="game-card" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener noreferrer"' : ''}><span class="gi">${icon}</span><span><b>${esc(name)}</b><span class="d">${esc(d)}</span></span>${done ? `<span class="done">${esc(done)}</span>` : ''}${shelf ? `<span class="go">${ext ? '↗' : '›'}</span>` : ''}</a>`;
+  const st = (k, f) => { const x = LS.get(k + ':' + todayKey(), null); return x ? f(x) : ''; };
   $('#main').innerHTML = `<div class="hub">
-    <h2>The paper's own, new every day</h2>
-    ${card('#typecase', 'T', 'Type Case', 'Seven letters in the tray. How many words can you set?', tc && tc.found.length ? `${tc.found.length} word${tc.found.length === 1 ? '' : 's'}` : '')}
-    ${card('#columns', '▥', 'Four Columns', 'Sixteen words, four hidden groups of four.', fc && fc.over ? (fc.solved.length === 4 && fc.slips < 4 ? 'solved' : 'played') : '')}
-    ${card('#stoppress', '¶', 'Stop Press', 'One five-letter word, six proofs to find it.', sp && sp.over ? 'played' : (sp && sp.rows.length ? `${sp.rows.length} of 6` : ''))}
-    ${card('#crossword', '▦', 'The Crossword', 'A small daily grid: three across, three down.', (x => x && x.over ? (x.revealed ? 'shown' : 'solved') : '')(LS.get('xw:' + todayKey(), null)))}
-    ${card('#dateline', '⏳', 'Dateline', 'Six events from history. Put them in order.', (x => x && x.over ? 'played' : '')(LS.get('dl:' + todayKey(), null)))}
-    ${card('#quiz', '?', 'The Quiz', 'Six questions, one from each category.', (x => x && x.picks.length >= 6 ? 'played' : '')(LS.get('qz:' + todayKey(), null)))}
-    <h2>From elsewhere, free</h2>
-    ${SHELF.map(g => card(g.embed ? '#g:' + g.id : g.url, g.icon, g.name, g.d, '', !g.embed)).join('')}
-    <p class="howto">Games from elsewhere belong to their makers and run from their own sites; the paper only gives them a frame. If one misbehaves in the frame, use “open in its own tab”.</p>
+    <div class="hub-head"><div class="kicker">${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div><h2>The Puzzle Page</h2></div>
+    <h3>The paper's own · new every day</h3>
+    <div class="game-grid">
+    ${card('#stoppress', '¶', 'Stop Press', 'One five-letter word, six proofs to find it.', st('sp', x => x.over ? 'played' : x.rows.length ? `${x.rows.length} of 6` : ''))}
+    ${card('#typecase', 'T', 'Type Case', 'Seven letters in the tray. How many words can you set?', st('tc', x => x.found.length ? `${x.found.length} word${x.found.length === 1 ? '' : 's'}` : ''))}
+    ${card('#columns', '▥', 'Four Columns', 'Sixteen words, four hidden groups.', st('fc', x => x.over ? (x.solved.length === 4 ? 'solved' : 'played') : ''))}
+    ${card('#crossword', '▦', 'The Crossword', 'A small grid: three across, three down.', st('xw', x => x.over ? (x.revealed ? 'shown' : 'solved') : ''))}
+    ${card('#dateline', '⏳', 'Dateline', 'Six events from history, to put in order.', st('dl', x => x.over ? 'played' : ''))}
+    ${card('#quiz', '?', 'The Quiz', 'Six questions, one from each category.', st('qz', x => x.picks.length >= 6 ? 'played' : ''))}
+    </div>
+    <h3>From elsewhere · free</h3>
+    <div class="shelf">${SHELF.map(g => card(g.embed ? '#g:' + g.id : g.url, g.icon, g.name, g.d, '', !g.embed, true)).join('')}</div>
+    <p class="howto">Games from elsewhere belong to their makers and run from their own sites; the paper only gives them a frame. If one misbehaves in the frame, use “own tab”.</p>
   </div>`;
 }
 
@@ -297,7 +303,7 @@ async function quiz() {
       return;
     }
     const q = qs[i];
-    $('#main').innerHTML = `<p class="howto">Question ${i + 1} of ${qs.length} · ${score} right so far</p><p class="qz-cat">${esc(q.cat)}</p><p class="qz-q">${esc(q.text)}</p>
+    $('#main').innerHTML = `<div class="qz-dots">${qs.map((x, k) => `<i class="${k < i ? (st.picks[k] === x.right ? 'ok' : 'no') : k === i ? 'now' : ''}"></i>`).join('')}</div><p class="qz-cat">${esc(q.cat)}</p><p class="qz-q">${esc(q.text)}</p>
       <div class="qz-opts" id="qzOpts">${q.opts.map(o => `<button data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div><div class="msg" id="qzMsg"></div><div class="row"><button class="btn hidden" id="qzNext">${i === qs.length - 1 ? 'See the score' : 'Next question'}</button></div>`;
     $('#qzOpts').onclick = e => { const b = e.target.closest('button'); if (!b || $('#qzOpts').dataset.done) return; $('#qzOpts').dataset.done = 1;
       const pick = b.dataset.o; st.picks.push(pick); LS.set('qz:' + todayKey(), st);
