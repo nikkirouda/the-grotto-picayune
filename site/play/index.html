@@ -69,6 +69,30 @@
   .sp-kb button.wide { max-width: 62px; flex: 1.6; font-size: .8rem; text-transform: none; }
   .sp-kb button.move { border-radius: 99px; }
 
+  /* The Crossword */
+  .xw-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; max-width: 320px; margin: 10px auto; }
+  .xw-cell { aspect-ratio: 1; position: relative; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); font-family: var(--font); font-size: 1.5rem; font-weight: 700; text-transform: uppercase; border-radius: 4px; padding: 0; }
+  .xw-cell.black { background: var(--ink); opacity: .85; border-color: transparent; }
+  .xw-cell.word { background: color-mix(in srgb, var(--accent) 22%, var(--bg2)); }
+  .xw-cell.cur { background: var(--gold); color: #fff; }
+  .xw-cell.bad { color: var(--dislike); text-decoration: line-through; }
+  .xw-cell i { position: absolute; top: 2px; left: 4px; font: 600 .6rem var(--sans); color: var(--muted); }
+  .xw-cell.cur i { color: #fff; }
+  .xw-clue { min-height: 3em; background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: .98rem; }
+  .xw-list { display: grid; gap: 4px; margin-top: 8px; }
+  .xw-list button { text-align: left; background: transparent; border: 0; border-left: 3px solid transparent; color: var(--ink); padding: 6px 8px; font-size: .92rem; }
+  .xw-list button.on { border-left-color: var(--gold); background: var(--bg2); }
+  /* Dateline and The Quiz */
+  .dl-item { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 6px; }
+  .dl-item.ok { border-left-color: var(--like); } .dl-item.no { border-left-color: var(--dislike); }
+  .dl-year { font-family: var(--font); font-weight: 700; min-width: 2.6em; color: var(--muted); }
+  .dl-text { flex: 1; font-size: .98rem; }
+  .dl-move { display: flex; flex-direction: column; gap: 4px; } .dl-move button { width: 40px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); } .dl-move button:disabled { opacity: .25; }
+  .qz-cat { color: var(--gold); font-weight: 600; margin: 0; } .qz-q { font-family: var(--font); font-size: 1.3rem; margin: 6px 0 14px; }
+  .qz-opts { display: grid; gap: 8px; } .qz-opts button { text-align: left; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); font-size: 1rem; }
+  .qz-opts button.ok { border-color: var(--like); background: color-mix(in srgb, var(--like) 18%, var(--bg2)); } .qz-opts button.no { border-color: var(--dislike); background: color-mix(in srgb, var(--dislike) 18%, var(--bg2)); }
+  .qz-score { font-family: var(--font); font-size: 2.4rem; text-align: center; margin: 10px 0 0; }
+
   /* embedded games */
   .embed { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; }
   .embed iframe { flex: 1; border: 0; width: 100%; background: #fff; }
