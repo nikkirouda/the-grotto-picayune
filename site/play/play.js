@@ -225,7 +225,8 @@ async function crossword(kind) {
   const mini = kind === 'mini';
   frame(mini ? 'The Mini' : 'The Crossword');
   const data = await load(mini ? 'crossword' : 'crossword9'); const n = dayNo(data.start);
-  const raw = data.puzzles[n % data.puzzles.length], p = mini ? miniAsGrid(raw) : raw;
+  const raw = data.puzzles[n % data.puzzles.length], gentle = !mini && LS.get('cwGentle', false) && raw.ae;
+  const p = mini ? miniAsGrid(raw) : gentle ? { grid: raw.grid, a: raw.ae, d: raw.de } : raw;
   const N = p.grid.length, sol = (r, c) => p.grid[r][c] === '#' ? null : p.grid[r][c];
   // numbering and entries
   const num = {}, entries = []; let k = 0;
@@ -244,7 +245,7 @@ async function crossword(kind) {
   let [r, c] = entries[0].cells[0], dir = 'a', wrong = new Set();
   $('#main').innerHTML = `<div class="xw-clue" id="xwClue"></div><div class="xw-grid n${N}" id="xwGrid" style="grid-template-columns:repeat(${N},1fr)"></div><div class="msg" id="xwMsg"></div>
     <div class="sp-kb" id="xwKb"></div>
-    <div class="row"><button class="btn quiet" id="xwCheck">Check</button><button class="btn quiet" id="xwReveal">Show the answers</button></div>
+    <div class="row"><button class="btn quiet" id="xwCheck">Check</button><button class="btn quiet" id="xwReveal">Show the answers</button>${!mini && raw.ae ? `<button class="btn quiet" id="xwEase">${gentle ? 'Harder clues' : 'Gentler clues'}</button>` : ''}</div>
     <div class="xw-lists"><div><h4>Across</h4><div class="xw-list" id="xwA"></div></div><div><h4>Down</h4><div class="xw-list" id="xwD"></div></div></div>`;
   $('#xwKb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm⌫'].map(row => '<div>' + [...row].map(ch => `<button data-k="${ch}" class="${ch === '⌫' ? 'wide' : ''}">${ch}</button>`).join('') + '</div>').join('');
   const say = t => { $('#xwMsg').textContent = t; };
@@ -280,6 +281,7 @@ async function crossword(kind) {
   $('#xwKb').onclick = ev => { const b = ev.target.closest('button'); if (b) press(b.dataset.k); };
   $('#xwCheck').onclick = () => { wrong = new Set(); for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (sol(i, j) != null && st.g[i * N + j] && st.g[i * N + j] !== sol(i, j)) wrong.add(i * N + j); say(wrong.size ? `${wrong.size} letter${wrong.size === 1 ? '' : 's'} to look at again.` : 'Nothing wrong so far.'); draw(); };
   $('#xwReveal').onclick = () => { if (st.over || !confirm('Show the answers? That ends today\'s crossword.')) return; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (sol(i, j) != null) st.g[i * N + j] = sol(i, j); st.over = true; st.revealed = true; LS.set(key, st); draw(); };
+  if ($('#xwEase')) $('#xwEase').onclick = () => { LS.set('cwGentle', !gentle); crossword(kind); };
   keyHandler = ev => { if (ev.metaKey || ev.ctrlKey || ev.altKey) return; if (ev.key === 'Backspace') press('⌫'); else if (/^[a-z]$/i.test(ev.key)) press(ev.key.toLowerCase()); else if (ev.key.startsWith('Arrow')) { const d = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[ev.key]; const rr = r + d[0], cc = c + d[1]; if (rr >= 0 && rr < N && cc >= 0 && cc < N && sol(rr, cc) != null) { r = rr; c = cc; const want = d[0] ? 'd' : 'a'; if (entryAt(r, c, want)) dir = want; } draw(); ev.preventDefault(); } };
   draw();
 }
