@@ -865,7 +865,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v19';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v20';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;
@@ -1023,7 +1023,21 @@ async function rebuild() {
 }
 
 // ------------------------------------------------------------- boot
+// A browser that blocks cookies and site data for this page (Brave with all cookies blocked, a private window)
+// lets nothing be remembered: passphrase, key, votes, settings. Say so plainly (Captain, 2026-11-28).
+function storageWorks() {
+  try { const k = 'picayune:probe'; localStorage.setItem(k, '1'); const ok = localStorage.getItem(k) === '1'; localStorage.removeItem(k); return ok; }
+  catch { return false; }
+}
+function showStorageWarning() {
+  const n = document.createElement('div'); n.className = 'storage-warning'; n.setAttribute('role', 'alert');
+  n.innerHTML = '<b>This browser isn\'t letting the paper remember anything</b>, so it will ask for the passphrase every visit and can\'t keep your key, votes or settings. ' +
+    'The paper stores these only on this device, in this browser; nothing goes to any server but GitHub, and there are no trackers. ' +
+    'To fix it, allow cookies and site data for <b>nikkirouda.github.io</b> only. In Brave: Settings → Site settings (or Privacy) → Cookies → add <b>nikkirouda.github.io</b> as allowed; your block stays on for every other site.';
+  document.body.prepend(n);
+}
 (async function boot() {
+  if (!storageWorks()) showStorageWarning();
   const theme = LS.get('theme', null); if (theme) document.documentElement.dataset.theme = theme;
   document.body.classList.toggle('compact', opts.compact);
   wireSettings(); wireWelcome();

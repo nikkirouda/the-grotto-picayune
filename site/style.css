@@ -206,3 +206,4 @@ main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; }
 #readerText table { border-collapse: collapse; font-family: var(--sans); font-size: calc(.88rem * var(--rs, 1)); line-height: 1.35; min-width: 100%; }
 #readerText th, #readerText td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
 #readerText tr:first-child td, #readerText th { font-weight: 600; background: var(--bg2); }
+.storage-warning { background: color-mix(in srgb, var(--dislike) 18%, var(--bg)); border-bottom: 1px solid var(--dislike); color: var(--ink); padding: 12px 16px; font-size: .92rem; line-height: 1.45; }
