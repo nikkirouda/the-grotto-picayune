@@ -645,7 +645,7 @@ function renderTabs() {
     if (last && grp !== last) h += '<span class="sep"></span>';
     h += link(e.id, e.name); last = grp;
   }
-  t.innerHTML = h;
+  t.innerHTML = h + '<span class="sep"></span><a href="play/">Puzzles</a>';
   const a = $('#tabs a.active'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' });
   renderMenu(entries);
 }
@@ -654,7 +654,7 @@ function renderMenu(entries = sectionEntries()) {
   const ranked = entries.map((e, i) => ({ e, i, s: visitScore(e.id, now) })).sort((a, b) => (b.s - a.s) || (a.i - b.i)).map(x => x.e);
   const label = { place: 'place', section: '', paper: 'subscriber' };
   $('#menuList').innerHTML = ranked.map(e => `<a href="#/${e.id}" class="${route === e.id && !query ? 'active' : ''}"><span>${esc(e.name)}</span><span class="kind">${label[e.kind] || ''}</span></a>`).join('')
-    + '<p class="note muted small">Your most-read sections come first, on this device.</p>';
+    + '<a href="play/"><span>Puzzles</span><span class="kind">games</span></a><p class="note muted small">Your most-read sections come first, on this device.</p>';
   $$('#menuList a').forEach(a => a.onclick = () => openMenu(false));
 }
 function openMenu(open) {
@@ -865,7 +865,7 @@ function stepReaderSize(d) { LS.set('readerSize', Math.min(READER_SIZES.length -
 // The page's own code only changes on a reload, and a tab can stay open for days. When the site carries a
 // newer version (sw.js names it), reload on the next return to the tab, never while a story is open or a
 // box is being typed in (2026-11-16: an all-day laptop tab kept running the morning's code).
-const APP_VERSION = 'picayune-shell-v20';   // keep equal to SHELL in sw.js
+const APP_VERSION = 'picayune-shell-v21';   // keep equal to SHELL in sw.js
 let lastVersionCheck = 0, newVersionWaiting = false;
 async function checkForNewVersion() {
   if (Date.now() - lastVersionCheck < 5 * 60e3 && !newVersionWaiting) return;

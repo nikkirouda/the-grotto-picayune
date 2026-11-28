@@ -138,3 +138,13 @@ python3 -m http.server -d site 8000     # then open http://localhost:8000
   a repository secret; the next build re-locks `private.enc` with it and commits the change. The site's
   settings sync asks for it once per device. Until it exists, the build falls back to `NEWS_PASSPHRASE`.
 - Older copies of `private.enc` in this repository's history stay locked with the shared key.
+
+## Puzzles (`site/play/`)
+
+A page of games, linked from the tab row and the ☰ menu. Two are the paper's own, new each day and played
+entirely in the browser: **Type Case** (set words from seven letters; puzzles in `typecase.json`, made by
+`build/make_typecase.py` from the public-domain ENABLE word list filtered by word frequency) and **Four Columns**
+(sort sixteen words into four groups; puzzles written by hand in `columns.json` — add more there). The shelf of
+other people's free games is the `SHELF` list in `play.js`: `embed: true` only where the game's site sends no
+frame-blocking header; otherwise it is a link. Embedded games run in a sandboxed frame from their own sites.
+
