@@ -74,6 +74,8 @@ async function typecase() {
     <div class="tc-tray" id="tcTray"></div>
     <div class="row"><button class="btn quiet" id="tcDel">Delete</button><button class="btn quiet" id="tcMix">Shuffle</button><button class="btn" id="tcGo">Enter</button></div>
     <div class="found" id="tcFound"></div>
+    <div class="row"><button class="btn quiet" id="tcReveal">Show today's answers</button></div>
+    <div id="tcMissed"></div>
     ${yest ? `<details class="y"><summary>Yesterday's words (${yest.words.length})</summary><p>${yest.words.map(esc).join(', ')}</p></details>` : ''}`;
   const say = t => { $('#tcMsg').textContent = t; };
   const draw = () => {
@@ -87,7 +89,14 @@ async function typecase() {
     $('#tcBar').style.width = Math.round(frac * 100) + '%';
     $('#tcFound').innerHTML = st.found.slice().sort().map(w => `<span class="${isFull(w) ? 'full' : ''}">${w}</span>`).join('') + st.bonus.slice().sort().map(w => `<span class="bonus" title="a real word, but not on today's list">${w}</span>`).join('');
   };
+  const showMissed = () => {
+    if (!st.revealed) return;
+    const missed = p.words.filter(w => !st.found.includes(w));
+    $('#tcReveal').classList.add('hidden'); $('#tcGo').disabled = true;
+    $('#tcMissed').innerHTML = `<p class="howto" style="margin-top:14px">${missed.length ? `The ${missed.length} you didn't set:` : 'You had them all.'}</p><div class="found">${missed.map(w => `<span class="${isFull(w) ? 'full' : ''}">${w}</span>`).join('')}</div><p class="howto">Today's tray is closed. A new one tomorrow.</p>`;
+  };
   const enter = () => {
+    if (st.revealed) { cur = ''; say('Today\'s answers are showing; a new tray tomorrow.'); draw(); return; }
     const w = cur; cur = '';
     if (w.length < 4) say('Four letters or more.');
     else if (!w.includes(p.key)) say(`It needs the gold letter, ${p.key.toUpperCase()}.`);
@@ -102,8 +111,9 @@ async function typecase() {
   $('#tcDel').onclick = () => { cur = cur.slice(0, -1); draw(); };
   $('#tcMix').onclick = () => { order = shuffle(order); draw(); };
   $('#tcGo').onclick = enter;
+  $('#tcReveal').onclick = () => { if (!confirm('Show all of today\'s answers? That ends today\'s game.')) return; st.revealed = true; LS.set('tc:' + todayKey(), st); showMissed(); };
   keyHandler = e => { if (e.metaKey || e.ctrlKey || e.altKey) return; if (e.key === 'Enter') { e.preventDefault(); enter(); } else if (e.key === 'Backspace') { cur = cur.slice(0, -1); draw(); } else if (/^[a-z]$/i.test(e.key)) add(e.key.toLowerCase()); };
-  draw();
+  draw(); showMissed();
 }
 
 // ------------------------------------------------------------------ Four Columns
