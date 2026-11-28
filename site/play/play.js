@@ -1,4 +1,4 @@
-/* The Grotto Picayune — Puzzles. Two games of the paper's own (Type Case, Four Columns) and a shelf of other
+/* The Grotto Picayune — Puzzles. Three games of the paper's own (Type Case, Four Columns, Stop Press) and a shelf of other
    people's free daily games: embedded where their site allows it, linked where it does not.
    Nothing here leaves the device; progress is kept in this browser under "picayune:play:". */
 (() => {
@@ -36,12 +36,13 @@ function frame(title, own) {
 // ------------------------------------------------------------------ hub
 function hub() {
   frame('Puzzles');
-  const tc = LS.get('tc:' + todayKey(), null), fc = LS.get('fc:' + todayKey(), null);
+  const tc = LS.get('tc:' + todayKey(), null), fc = LS.get('fc:' + todayKey(), null), sp = LS.get('sp:' + todayKey(), null);
   const card = (href, icon, name, d, done, ext) => `<a class="game-card" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener noreferrer"' : ''}><span class="gi">${icon}</span><span><b>${esc(name)}</b><span class="d">${esc(d)}</span></span>${done ? `<span class="done">${esc(done)}</span>` : ''}</a>`;
   $('#main').innerHTML = `<div class="hub">
     <h2>The paper's own, new every day</h2>
     ${card('#typecase', 'T', 'Type Case', 'Seven letters in the tray. How many words can you set?', tc && tc.found.length ? `${tc.found.length} word${tc.found.length === 1 ? '' : 's'}` : '')}
     ${card('#columns', '▥', 'Four Columns', 'Sixteen words, four hidden groups of four.', fc && fc.over ? (fc.solved.length === 4 && fc.slips < 4 ? 'solved' : 'played') : '')}
+    ${card('#stoppress', '¶', 'Stop Press', 'One five-letter word, six proofs to find it.', sp && sp.over ? 'played' : (sp && sp.rows.length ? `${sp.rows.length} of 6` : ''))}
     <h2>From elsewhere, free</h2>
     ${SHELF.map(g => card(g.embed ? '#g:' + g.id : g.url, g.icon, g.name, g.d, '', !g.embed)).join('')}
     <p class="howto">Games from elsewhere belong to their makers and run from their own sites; the paper only gives them a frame. If one misbehaves in the frame, use “open in its own tab”.</p>
@@ -146,13 +147,60 @@ async function columns() {
   draw();
 }
 
+// ------------------------------------------------------------------ Stop Press
+// One five-letter word a day, six proofs to find it. The proofreader marks each letter: set (right letter,
+// right place), move (in the word, wrong place), or struck (not in the word).
+function spMarks(guess, answer) {
+  const m = Array(5).fill('struck'), left = {};
+  for (let i = 0; i < 5; i++) { if (guess[i] === answer[i]) m[i] = 'set'; else left[answer[i]] = (left[answer[i]] || 0) + 1; }
+  for (let i = 0; i < 5; i++) if (m[i] !== 'set' && left[guess[i]]) { m[i] = 'move'; left[guess[i]]--; }
+  return m;
+}
+async function stoppress() {
+  frame('Stop Press');
+  const data = await load('stoppress'); const n = dayNo(data.start);
+  const answer = data.answers[n % data.answers.length];
+  const valid = w => { for (let i = 0; i < data.guesses.length; i += 5) if (data.guesses.startsWith(w, i)) return true; return false; };
+  const st = LS.get('sp:' + todayKey(), { rows: [], over: false });
+  let cur = '';
+  $('#main').innerHTML = `<p class="howto">Find today's five-letter word in six proofs. After each, the proofreader marks every letter: <span class="sp-key set">set</span> right place, <span class="sp-key move">move</span> in the word but elsewhere, <span class="sp-key struck">struck</span> not in the word.</p>
+    <div class="sp-sheet" id="spSheet"></div><div class="msg" id="spMsg"></div><div class="sp-kb" id="spKb"></div>`;
+  const say = t => { $('#spMsg').textContent = t; };
+  const draw = () => {
+    let h = '';
+    for (let r = 0; r < 6; r++) {
+      const g = st.rows[r], marks = g ? spMarks(g, answer) : null, live = !g && r === st.rows.length && !st.over;
+      h += `<div class="sp-line"><span class="sp-no">${r + 1}</span>` + [0, 1, 2, 3, 4].map(i => `<span class="sp-cell ${marks ? marks[i] : ''}">${g ? g[i] : (live ? (cur[i] || '') : '')}</span>`).join('') + '</div>';
+    }
+    $('#spSheet').innerHTML = h;
+    const best = {}; const rank = { struck: 1, move: 2, set: 3 };
+    for (const g of st.rows) spMarks(g, answer).forEach((m, i) => { if (!best[g[i]] || rank[m] > rank[best[g[i]]]) best[g[i]] = m; });
+    $('#spKb').innerHTML = ['qwertyuiop', 'asdfghjkl', '⏎zxcvbnm⌫'].map(row => '<div>' + [...row].map(c => `<button data-k="${c}" class="${best[c] || ''} ${c === '⏎' || c === '⌫' ? 'wide' : ''}">${c === '⏎' ? 'Proof' : c}</button>`).join('') + '</div>').join('');
+    if (st.over) say(st.rows[st.rows.length - 1] === answer ? `Passed for press in ${st.rows.length}. A new word tomorrow.` : `The word was ${answer.toUpperCase()}. A new one tomorrow.`);
+  };
+  const press = k => {
+    if (st.over) return;
+    if (k === '⌫') cur = cur.slice(0, -1);
+    else if (k === '⏎') {
+      if (cur.length < 5) return say('Five letters.');
+      if (!valid(cur)) return say('Not in the paper\'s word list.');
+      st.rows.push(cur); cur = ''; if (st.rows[st.rows.length - 1] === answer || st.rows.length === 6) st.over = true;
+      LS.set('sp:' + todayKey(), st); say('');
+    } else if (cur.length < 5) { cur += k; say(''); }
+    draw();
+  };
+  $('#spKb').onclick = e => { const b = e.target.closest('button'); if (b) press(b.dataset.k); };
+  keyHandler = e => { if (e.metaKey || e.ctrlKey || e.altKey) return; if (e.key === 'Enter') { e.preventDefault(); press('⏎'); } else if (e.key === 'Backspace') press('⌫'); else if (/^[a-z]$/i.test(e.key)) press(e.key.toLowerCase()); };
+  draw();
+}
+
 // ------------------------------------------------------------------ routing
 let keyHandler = null;
 document.addEventListener('keydown', e => { if (keyHandler) keyHandler(e); });
 function route() {
   keyHandler = null;
   const h = location.hash.replace(/^#/, '');
-  if (h === 'typecase') typecase(); else if (h === 'columns') columns(); else if (h.startsWith('g:')) embed(h.slice(2)); else hub();
+  if (h === 'typecase') typecase(); else if (h === 'stoppress') stoppress(); else if (h === 'columns') columns(); else if (h.startsWith('g:')) embed(h.slice(2)); else hub();
 }
 window.addEventListener('hashchange', route);
 route();

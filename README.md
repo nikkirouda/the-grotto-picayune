@@ -142,7 +142,7 @@ python3 -m http.server -d site 8000     # then open http://localhost:8000
 ## Puzzles (`site/play/`)
 
 A page of games, linked from the tab row and the ☰ menu. Two are the paper's own, new each day and played
-entirely in the browser: **Type Case** (set words from seven letters; puzzles in `typecase.json`, made by
+entirely in the browser: **Stop Press** (a five-letter word in six tries; lists in `stoppress.json`, made by `build/make_stoppress.py`), **Type Case** (set words from seven letters; puzzles in `typecase.json`, made by
 `build/make_typecase.py` from the public-domain ENABLE word list filtered by word frequency) and **Four Columns**
 (sort sixteen words into four groups; puzzles written by hand in `columns.json` — add more there). The shelf of
 other people's free games is the `SHELF` list in `play.js`: `embed: true` only where the game's site sends no
