@@ -1,4 +1,4 @@
-/* The Grotto Picayune — Puzzles. Six games of the paper's own (Type Case, Four Columns, Stop Press, The Crossword, Dateline, The Quiz) and a shelf of other
+/* The Grotto Picayune — Puzzles. Seven games of the paper's own (Type Case, Four Columns, Stop Press, The Crossword, The Mini, Dateline, The Quiz) and a shelf of other
    people's free daily games: embedded where their site allows it, linked where it does not.
    Nothing here leaves the device; progress is kept in this browser under "picayune:play:". */
 (() => {
@@ -10,7 +10,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem('picayune:play:' + k, JSON.stringify(v)); } catch {} },
 };
 // The styles travel with this file: whatever copy of the page the browser kept, the right stylesheet is loaded.
-const PLAY_V = 25;
+const PLAY_V = 26;
 if (!document.querySelector(`link[href="play.css?v=${PLAY_V}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = `play.css?v=${PLAY_V}`; document.head.appendChild(l); document.querySelectorAll('style').forEach(x => x.remove()); }
 try { const t = JSON.parse(localStorage.getItem('picayune:theme')); if (t) document.documentElement.dataset.theme = t; } catch {}
 
@@ -48,7 +48,8 @@ function hub() {
     ${card('#stoppress', '¶', 'Stop Press', 'One five-letter word, six proofs to find it.', st('sp', x => x.over ? 'played' : x.rows.length ? `${x.rows.length} of 6` : ''))}
     ${card('#typecase', 'T', 'Type Case', 'Seven letters in the tray. How many words can you set?', st('tc', x => x.found.length ? `${x.found.length} word${x.found.length === 1 ? '' : 's'}` : ''))}
     ${card('#columns', '▥', 'Four Columns', 'Sixteen words, four hidden groups.', st('fc', x => x.over ? (x.solved.length === 4 ? 'solved' : 'played') : ''))}
-    ${card('#crossword', '▦', 'The Crossword', 'A small grid: three across, three down.', st('xw', x => x.over ? (x.revealed ? 'shown' : 'solved') : ''))}
+    ${card('#crossword', '▦', 'The Crossword', 'A traditional grid, nine squares by nine.', st('cw', x => x.over ? (x.revealed ? 'shown' : 'solved') : ''))}
+    ${card('#mini', '▫', 'The Mini', 'A small grid: three across, three down.', st('xw', x => x.over ? (x.revealed ? 'shown' : 'solved') : ''))}
     ${card('#dateline', '⏳', 'Dateline', 'Ten events from history, to put in order.', st('dl', x => x.over ? 'played' : ''))}
     ${card('#quiz', '?', 'The Quiz', 'Six questions, one from each category.', st('qz', x => x.picks.length >= 6 ? 'played' : ''))}
     </div>
@@ -213,52 +214,73 @@ async function stoppress() {
   draw();
 }
 
-// ------------------------------------------------------------------ The Crossword (a five-by-five lattice)
-async function crossword() {
-  frame('The Crossword');
-  const data = await load('crossword'); const n = dayNo(data.start);
-  const p = data.puzzles[n % data.puzzles.length];
-  const sol = (r, c) => r % 2 === 0 ? p.a[r / 2][c] : (c % 2 === 0 ? p.d[c / 2][r] : null);
-  const NUM = { '0,0': 1, '0,2': 2, '0,4': 3, '2,0': 4, '4,0': 5 };
-  const CLUES = [['a', 0, '1 Across', p.ac[0]], ['a', 2, '4 Across', p.ac[1]], ['a', 4, '5 Across', p.ac[2]], ['d', 0, '1 Down', p.dc[0]], ['d', 2, '2 Down', p.dc[1]], ['d', 4, '3 Down', p.dc[2]]];
-  const st = LS.get('xw:' + todayKey(), { g: Array(25).fill(''), over: false, checked: false });
-  let r = 0, c = 0, dir = 'a', wrong = new Set();
-  $('#main').innerHTML = `<div class="xw-clue" id="xwClue"></div><div class="xw-grid" id="xwGrid"></div><div class="msg" id="xwMsg"></div>
+// ------------------------------------------------------------------ Crosswords (any square grid)
+// The Crossword is a traditional nine-by-nine: every letter crossed, symmetric blocks, no word under three
+// letters. The Mini is the five-by-five lattice. Both run on this one engine: rows of letters with # for blocks.
+function miniAsGrid(p) {
+  const row = r => r % 2 === 0 ? p.a[r / 2] : [0, 1, 2, 3, 4].map(c => c % 2 === 0 ? p.d[c / 2][r] : '#').join('');
+  return { grid: [0, 1, 2, 3, 4].map(row), a: { 1: p.ac[0], 4: p.ac[1], 5: p.ac[2] }, d: { 1: p.dc[0], 2: p.dc[1], 3: p.dc[2] } };
+}
+async function crossword(kind) {
+  const mini = kind === 'mini';
+  frame(mini ? 'The Mini' : 'The Crossword');
+  const data = await load(mini ? 'crossword' : 'crossword9'); const n = dayNo(data.start);
+  const raw = data.puzzles[n % data.puzzles.length], p = mini ? miniAsGrid(raw) : raw;
+  const N = p.grid.length, sol = (r, c) => p.grid[r][c] === '#' ? null : p.grid[r][c];
+  // numbering and entries
+  const num = {}, entries = []; let k = 0;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    if (sol(r, c) == null) continue;
+    const sa = (c === 0 || sol(r, c - 1) == null) && c + 1 < N && sol(r, c + 1) != null;
+    const sd = (r === 0 || sol(r - 1, c) == null) && r + 1 < N && sol(r + 1, c) != null;
+    if (sa || sd) num[r + ',' + c] = ++k;
+    if (sa) { const cells = []; for (let x = c; x < N && sol(r, x) != null; x++) cells.push([r, x]); entries.push({ dir: 'a', n: k, cells, clue: p.a[k] }); }
+    if (sd) { const cells = []; for (let x = r; x < N && sol(x, c) != null; x++) cells.push([x, c]); entries.push({ dir: 'd', n: k, cells, clue: p.d[k] }); }
+  }
+  entries.sort((x, y) => (x.dir === y.dir ? x.n - y.n : x.dir === 'a' ? -1 : 1));
+  const entryAt = (r, c, dir) => entries.find(e => e.dir === dir && e.cells.some(([rr, cc]) => rr === r && cc === c));
+  const key = (mini ? 'xw:' : 'cw:') + todayKey();
+  let st = LS.get(key, null); if (!st || !st.g || st.g.length !== N * N) st = { g: Array(N * N).fill(''), over: false };
+  let [r, c] = entries[0].cells[0], dir = 'a', wrong = new Set();
+  $('#main').innerHTML = `<div class="xw-clue" id="xwClue"></div><div class="xw-grid n${N}" id="xwGrid" style="grid-template-columns:repeat(${N},1fr)"></div><div class="msg" id="xwMsg"></div>
     <div class="sp-kb" id="xwKb"></div>
     <div class="row"><button class="btn quiet" id="xwCheck">Check</button><button class="btn quiet" id="xwReveal">Show the answers</button></div>
-    <div class="xw-list" id="xwList"></div>`;
+    <div class="xw-lists"><div><h4>Across</h4><div class="xw-list" id="xwA"></div></div><div><h4>Down</h4><div class="xw-list" id="xwD"></div></div></div>`;
+  $('#xwKb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm⌫'].map(row => '<div>' + [...row].map(ch => `<button data-k="${ch}" class="${ch === '⌫' ? 'wide' : ''}">${ch}</button>`).join('') + '</div>').join('');
   const say = t => { $('#xwMsg').textContent = t; };
-  const inWord = (rr, cc) => dir === 'a' ? rr === r : cc === c;
-  const fixDir = () => { if (r % 2 === 1) dir = 'd'; else if (c % 2 === 1) dir = 'a'; };
+  const cur = () => entryAt(r, c, dir) || entryAt(r, c, dir === 'a' ? 'd' : 'a');
   const draw = () => {
+    const e = cur(); if (e) dir = e.dir;
+    const inWord = new Set(e ? e.cells.map(([rr, cc]) => rr * N + cc) : []);
     let h = '';
-    for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
       if (sol(i, j) == null) { h += '<span class="xw-cell black"></span>'; continue; }
-      const k = i * 5 + j;
-      h += `<button class="xw-cell ${i === r && j === c ? 'cur' : inWord(i, j) ? 'word' : ''} ${wrong.has(k) ? 'bad' : ''}" data-r="${i}" data-c="${j}">${NUM[i + ',' + j] ? `<i>${NUM[i + ',' + j]}</i>` : ''}${esc(st.g[k])}</button>`;
+      const q = i * N + j;
+      h += `<button class="xw-cell ${i === r && j === c ? 'cur' : inWord.has(q) ? 'word' : ''} ${wrong.has(q) ? 'bad' : ''}" data-r="${i}" data-c="${j}">${num[i + ',' + j] ? `<i>${num[i + ',' + j]}</i>` : ''}${esc(st.g[q])}</button>`;
     }
     $('#xwGrid').innerHTML = h;
-    const cl = CLUES.find(x => x[0] === dir && x[1] === (dir === 'a' ? r : c));
-    $('#xwClue').innerHTML = cl ? `<b>${cl[2]}</b> ${esc(cl[3])}` : '';
-    $('#xwList').innerHTML = CLUES.map((x, i) => `<button data-i="${i}" class="${x === cl ? 'on' : ''}"><b>${x[2]}</b> ${esc(x[3])}</button>`).join('');
-    $('#xwKb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm⌫'].map(row => '<div>' + [...row].map(ch => `<button data-k="${ch}" class="${ch === '⌫' ? 'wide' : ''}">${ch}</button>`).join('') + '</div>').join('');
+    $('#xwClue').innerHTML = e ? `<b>${e.n} ${e.dir === 'a' ? 'Across' : 'Down'}</b> ${esc(e.clue || '')}` : '';
+    const list = d => entries.filter(x => x.dir === d).map(x => { const full = x.cells.every(([rr, cc]) => st.g[rr * N + cc]); return `<button data-i="${entries.indexOf(x)}" class="${x === e ? 'on' : ''} ${full ? 'full' : ''}"><b>${x.n}</b> ${esc(x.clue || '')}</button>`; }).join('');
+    $('#xwA').innerHTML = list('a'); $('#xwD').innerHTML = list('d');
     if (st.over) say(st.revealed ? 'Answers shown. A new grid tomorrow.' : 'Solved. A new grid tomorrow.');
   };
-  const step = d => { if (dir === 'a') c = Math.max(0, Math.min(4, c + d)); else r = Math.max(0, Math.min(4, r + d)); };
-  const press = k => {
+  const move = d => { const e = cur(); if (!e) return; const i = e.cells.findIndex(([rr, cc]) => rr === r && cc === c) + d; if (i >= 0 && i < e.cells.length) [r, c] = e.cells[i]; return i >= e.cells.length; };
+  const nextEntry = () => { const e = cur(), i = entries.indexOf(e); for (let s2 = 1; s2 <= entries.length; s2++) { const x = entries[(i + s2) % entries.length]; const open = x.cells.find(([rr, cc]) => !st.g[rr * N + cc]); if (open) { dir = x.dir; [r, c] = open; return; } } };
+  const press = ch => {
     if (st.over) return;
-    if (k === '⌫') { const i = r * 5 + c; if (st.g[i]) st.g[i] = ''; else { step(-1); st.g[r * 5 + c] = ''; } }
-    else { st.g[r * 5 + c] = k; wrong.delete(r * 5 + c); step(1); }
-    let done = true; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (sol(i, j) != null && st.g[i * 5 + j] !== sol(i, j)) done = false;
+    if (ch === '⌫') { const q = r * N + c; if (st.g[q]) st.g[q] = ''; else { move(-1); st.g[r * N + c] = ''; } }
+    else { st.g[r * N + c] = ch; wrong.delete(r * N + c); if (move(1)) nextEntry(); }
+    let done = true; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (sol(i, j) != null && st.g[i * N + j] !== sol(i, j)) done = false;
     if (done) st.over = true;
-    LS.set('xw:' + todayKey(), st); say(''); draw();
+    LS.set(key, st); say(''); draw();
   };
-  $('#xwGrid').onclick = e => { const b = e.target.closest('button'); if (!b) return; const rr = +b.dataset.r, cc = +b.dataset.c; if (rr === r && cc === c) dir = dir === 'a' ? 'd' : 'a'; r = rr; c = cc; fixDir(); draw(); };
-  $('#xwList').onclick = e => { const b = e.target.closest('button'); if (!b) return; const x = CLUES[+b.dataset.i]; dir = x[0]; if (dir === 'a') { r = x[1]; c = 0; } else { c = x[1]; r = 0; } draw(); };
-  $('#xwKb').onclick = e => { const b = e.target.closest('button'); if (b) press(b.dataset.k); };
-  $('#xwCheck').onclick = () => { wrong = new Set(); for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (sol(i, j) != null && st.g[i * 5 + j] && st.g[i * 5 + j] !== sol(i, j)) wrong.add(i * 5 + j); say(wrong.size ? `${wrong.size} letter${wrong.size === 1 ? '' : 's'} to look at again.` : 'Nothing wrong so far.'); draw(); };
-  $('#xwReveal').onclick = () => { if (st.over || !confirm('Show the answers? That ends today\'s crossword.')) return; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (sol(i, j) != null) st.g[i * 5 + j] = sol(i, j); st.over = true; st.revealed = true; LS.set('xw:' + todayKey(), st); draw(); };
-  keyHandler = e => { if (e.metaKey || e.ctrlKey || e.altKey) return; if (e.key === 'Backspace') press('⌫'); else if (/^[a-z]$/i.test(e.key)) press(e.key.toLowerCase()); else if (e.key.startsWith('Arrow')) { const d = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key]; const rr = r + d[0], cc = c + d[1]; if (rr >= 0 && rr < 5 && cc >= 0 && cc < 5 && sol(rr, cc) != null) { r = rr; c = cc; dir = d[0] ? 'd' : 'a'; fixDir(); draw(); } e.preventDefault(); } };
+  $('#xwGrid').onclick = ev => { const b = ev.target.closest('button'); if (!b) return; const rr = +b.dataset.r, cc = +b.dataset.c; if (rr === r && cc === c) { const o = dir === 'a' ? 'd' : 'a'; if (entryAt(r, c, o)) dir = o; } r = rr; c = cc; if (!entryAt(r, c, dir)) dir = dir === 'a' ? 'd' : 'a'; draw(); };
+  const pick = ev => { const b = ev.target.closest('button'); if (!b) return; const x = entries[+b.dataset.i]; dir = x.dir; [r, c] = x.cells.find(([rr, cc]) => !st.g[rr * N + cc]) || x.cells[0]; draw(); $('#xwClue').scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+  $('#xwA').onclick = pick; $('#xwD').onclick = pick;
+  $('#xwKb').onclick = ev => { const b = ev.target.closest('button'); if (b) press(b.dataset.k); };
+  $('#xwCheck').onclick = () => { wrong = new Set(); for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (sol(i, j) != null && st.g[i * N + j] && st.g[i * N + j] !== sol(i, j)) wrong.add(i * N + j); say(wrong.size ? `${wrong.size} letter${wrong.size === 1 ? '' : 's'} to look at again.` : 'Nothing wrong so far.'); draw(); };
+  $('#xwReveal').onclick = () => { if (st.over || !confirm('Show the answers? That ends today\'s crossword.')) return; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (sol(i, j) != null) st.g[i * N + j] = sol(i, j); st.over = true; st.revealed = true; LS.set(key, st); draw(); };
+  keyHandler = ev => { if (ev.metaKey || ev.ctrlKey || ev.altKey) return; if (ev.key === 'Backspace') press('⌫'); else if (/^[a-z]$/i.test(ev.key)) press(ev.key.toLowerCase()); else if (ev.key.startsWith('Arrow')) { const d = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[ev.key]; const rr = r + d[0], cc = c + d[1]; if (rr >= 0 && rr < N && cc >= 0 && cc < N && sol(rr, cc) != null) { r = rr; c = cc; const want = d[0] ? 'd' : 'a'; if (entryAt(r, c, want)) dir = want; } draw(); ev.preventDefault(); } };
   draw();
 }
 
@@ -321,7 +343,7 @@ document.addEventListener('keydown', e => { if (keyHandler) keyHandler(e); });
 function route() {
   keyHandler = null;
   const h = location.hash.replace(/^#/, '');
-  if (h === 'typecase') typecase(); else if (h === 'stoppress') stoppress(); else if (h === 'crossword') crossword(); else if (h === 'dateline') dateline(); else if (h === 'quiz') quiz(); else if (h === 'columns') columns(); else if (h.startsWith('g:')) embed(h.slice(2)); else hub();
+  if (h === 'typecase') typecase(); else if (h === 'stoppress') stoppress(); else if (h === 'crossword') crossword('big'); else if (h === 'mini') crossword('mini'); else if (h === 'dateline') dateline(); else if (h === 'quiz') quiz(); else if (h === 'columns') columns(); else if (h.startsWith('g:')) embed(h.slice(2)); else hub();
 }
 window.addEventListener('hashchange', route);
 route();

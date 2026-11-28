@@ -152,3 +152,6 @@ across and three down; each entry gives the six words and six clues, and the dow
 at letters 1, 3 and 5), **Dateline** (`timeline.json`: `[year, event]` pairs, one event per year; ten are drawn each
 day) and **The Quiz** (`trivia.json`: six categories of twelve questions; the first option is the right answer).
 Check any new date or fact against a source before adding it.
+**The Crossword** proper is `crossword9.json`: traditional 9×9 grids (every letter crossed, 180° symmetry, no word
+under three letters), each a `grid` of nine rows with `#` for blocks and clues keyed by number in `a` and `d`. The
+five-by-five lattice lives on as **The Mini** (`crossword.json`). One engine in play.js runs any square grid.
