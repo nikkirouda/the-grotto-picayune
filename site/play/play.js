@@ -1,4 +1,4 @@
-/* The Grotto Picayune — Puzzles. Three games of the paper's own (Type Case, Four Columns, Stop Press) and a shelf of other
+/* The Grotto Picayune — Puzzles. Six games of the paper's own (Type Case, Four Columns, Stop Press, The Crossword, Dateline, The Quiz) and a shelf of other
    people's free daily games: embedded where their site allows it, linked where it does not.
    Nothing here leaves the device; progress is kept in this browser under "picayune:play:". */
 (() => {
@@ -43,6 +43,9 @@ function hub() {
     ${card('#typecase', 'T', 'Type Case', 'Seven letters in the tray. How many words can you set?', tc && tc.found.length ? `${tc.found.length} word${tc.found.length === 1 ? '' : 's'}` : '')}
     ${card('#columns', '▥', 'Four Columns', 'Sixteen words, four hidden groups of four.', fc && fc.over ? (fc.solved.length === 4 && fc.slips < 4 ? 'solved' : 'played') : '')}
     ${card('#stoppress', '¶', 'Stop Press', 'One five-letter word, six proofs to find it.', sp && sp.over ? 'played' : (sp && sp.rows.length ? `${sp.rows.length} of 6` : ''))}
+    ${card('#crossword', '▦', 'The Crossword', 'A small daily grid: three across, three down.', (x => x && x.over ? (x.revealed ? 'shown' : 'solved') : '')(LS.get('xw:' + todayKey(), null)))}
+    ${card('#dateline', '⏳', 'Dateline', 'Six events from history. Put them in order.', (x => x && x.over ? 'played' : '')(LS.get('dl:' + todayKey(), null)))}
+    ${card('#quiz', '?', 'The Quiz', 'Six questions, one from each category.', (x => x && x.picks.length >= 6 ? 'played' : '')(LS.get('qz:' + todayKey(), null)))}
     <h2>From elsewhere, free</h2>
     ${SHELF.map(g => card(g.embed ? '#g:' + g.id : g.url, g.icon, g.name, g.d, '', !g.embed)).join('')}
     <p class="howto">Games from elsewhere belong to their makers and run from their own sites; the paper only gives them a frame. If one misbehaves in the frame, use “open in its own tab”.</p>
@@ -204,13 +207,113 @@ async function stoppress() {
   draw();
 }
 
+// ------------------------------------------------------------------ The Crossword (a five-by-five lattice)
+async function crossword() {
+  frame('The Crossword');
+  const data = await load('crossword'); const n = dayNo(data.start);
+  const p = data.puzzles[n % data.puzzles.length];
+  const sol = (r, c) => r % 2 === 0 ? p.a[r / 2][c] : (c % 2 === 0 ? p.d[c / 2][r] : null);
+  const NUM = { '0,0': 1, '0,2': 2, '0,4': 3, '2,0': 4, '4,0': 5 };
+  const CLUES = [['a', 0, '1 Across', p.ac[0]], ['a', 2, '4 Across', p.ac[1]], ['a', 4, '5 Across', p.ac[2]], ['d', 0, '1 Down', p.dc[0]], ['d', 2, '2 Down', p.dc[1]], ['d', 4, '3 Down', p.dc[2]]];
+  const st = LS.get('xw:' + todayKey(), { g: Array(25).fill(''), over: false, checked: false });
+  let r = 0, c = 0, dir = 'a', wrong = new Set();
+  $('#main').innerHTML = `<div class="xw-clue" id="xwClue"></div><div class="xw-grid" id="xwGrid"></div><div class="msg" id="xwMsg"></div>
+    <div class="sp-kb" id="xwKb"></div>
+    <div class="row"><button class="btn quiet" id="xwCheck">Check</button><button class="btn quiet" id="xwReveal">Show the answers</button></div>
+    <div class="xw-list" id="xwList"></div>`;
+  const say = t => { $('#xwMsg').textContent = t; };
+  const inWord = (rr, cc) => dir === 'a' ? rr === r : cc === c;
+  const fixDir = () => { if (r % 2 === 1) dir = 'd'; else if (c % 2 === 1) dir = 'a'; };
+  const draw = () => {
+    let h = '';
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+      if (sol(i, j) == null) { h += '<span class="xw-cell black"></span>'; continue; }
+      const k = i * 5 + j;
+      h += `<button class="xw-cell ${i === r && j === c ? 'cur' : inWord(i, j) ? 'word' : ''} ${wrong.has(k) ? 'bad' : ''}" data-r="${i}" data-c="${j}">${NUM[i + ',' + j] ? `<i>${NUM[i + ',' + j]}</i>` : ''}${esc(st.g[k])}</button>`;
+    }
+    $('#xwGrid').innerHTML = h;
+    const cl = CLUES.find(x => x[0] === dir && x[1] === (dir === 'a' ? r : c));
+    $('#xwClue').innerHTML = cl ? `<b>${cl[2]}</b> ${esc(cl[3])}` : '';
+    $('#xwList').innerHTML = CLUES.map((x, i) => `<button data-i="${i}" class="${x === cl ? 'on' : ''}"><b>${x[2]}</b> ${esc(x[3])}</button>`).join('');
+    $('#xwKb').innerHTML = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm⌫'].map(row => '<div>' + [...row].map(ch => `<button data-k="${ch}" class="${ch === '⌫' ? 'wide' : ''}">${ch}</button>`).join('') + '</div>').join('');
+    if (st.over) say(st.revealed ? 'Answers shown. A new grid tomorrow.' : 'Solved. A new grid tomorrow.');
+  };
+  const step = d => { if (dir === 'a') c = Math.max(0, Math.min(4, c + d)); else r = Math.max(0, Math.min(4, r + d)); };
+  const press = k => {
+    if (st.over) return;
+    if (k === '⌫') { const i = r * 5 + c; if (st.g[i]) st.g[i] = ''; else { step(-1); st.g[r * 5 + c] = ''; } }
+    else { st.g[r * 5 + c] = k; wrong.delete(r * 5 + c); step(1); }
+    let done = true; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (sol(i, j) != null && st.g[i * 5 + j] !== sol(i, j)) done = false;
+    if (done) st.over = true;
+    LS.set('xw:' + todayKey(), st); say(''); draw();
+  };
+  $('#xwGrid').onclick = e => { const b = e.target.closest('button'); if (!b) return; const rr = +b.dataset.r, cc = +b.dataset.c; if (rr === r && cc === c) dir = dir === 'a' ? 'd' : 'a'; r = rr; c = cc; fixDir(); draw(); };
+  $('#xwList').onclick = e => { const b = e.target.closest('button'); if (!b) return; const x = CLUES[+b.dataset.i]; dir = x[0]; if (dir === 'a') { r = x[1]; c = 0; } else { c = x[1]; r = 0; } draw(); };
+  $('#xwKb').onclick = e => { const b = e.target.closest('button'); if (b) press(b.dataset.k); };
+  $('#xwCheck').onclick = () => { wrong = new Set(); for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (sol(i, j) != null && st.g[i * 5 + j] && st.g[i * 5 + j] !== sol(i, j)) wrong.add(i * 5 + j); say(wrong.size ? `${wrong.size} letter${wrong.size === 1 ? '' : 's'} to look at again.` : 'Nothing wrong so far.'); draw(); };
+  $('#xwReveal').onclick = () => { if (st.over || !confirm('Show the answers? That ends today\'s crossword.')) return; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (sol(i, j) != null) st.g[i * 5 + j] = sol(i, j); st.over = true; st.revealed = true; LS.set('xw:' + todayKey(), st); draw(); };
+  keyHandler = e => { if (e.metaKey || e.ctrlKey || e.altKey) return; if (e.key === 'Backspace') press('⌫'); else if (/^[a-z]$/i.test(e.key)) press(e.key.toLowerCase()); else if (e.key.startsWith('Arrow')) { const d = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key]; const rr = r + d[0], cc = c + d[1]; if (rr >= 0 && rr < 5 && cc >= 0 && cc < 5 && sol(rr, cc) != null) { r = rr; c = cc; dir = d[0] ? 'd' : 'a'; fixDir(); draw(); } e.preventDefault(); } };
+  draw();
+}
+
+// ------------------------------------------------------------------ Dateline (put six events in order)
+async function dateline() {
+  frame('Dateline');
+  const data = await load('timeline'); const n = dayNo(data.start);
+  const picks = shuffle(data.events.map((_, i) => i), 1000 + n).slice(0, 6);
+  const right = picks.slice().sort((a, b) => data.events[a][0] - data.events[b][0]);
+  let start = shuffle(picks, 77 + n); if (start.join() === right.join()) start = start.reverse();
+  const st = LS.get('dl:' + todayKey(), { order: start, checks: 0, over: false });
+  $('#main').innerHTML = `<p class="howto">Put these six events in order, earliest at the top. You have three checks; each shows which ones are in the right place.</p>
+    <div id="dlList" class="dl-list"></div><div class="msg" id="dlMsg"></div>
+    <div class="row"><button class="btn" id="dlCheck">Check the order</button></div>`;
+  let marks = null;
+  const say = t => { $('#dlMsg').textContent = t; };
+  const draw = () => {
+    $('#dlList').innerHTML = st.order.map((id, i) => { const ok = st.over || marks ? id === right[i] : null;
+      return `<div class="dl-item ${ok === true ? 'ok' : ok === false ? 'no' : ''}"><span class="dl-year">${st.over ? data.events[id][0] : (i + 1)}</span><span class="dl-text">${esc(data.events[id][1])}</span>${st.over ? '' : `<span class="dl-move"><button data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move earlier">▲</button><button data-i="${i}" data-d="1" ${i === 5 ? 'disabled' : ''} aria-label="Move later">▼</button></span>`}</div>`; }).join('');
+    $('#dlCheck').disabled = st.over;
+    if (st.over) { const good = st.order.filter((id, i) => id === right[i]).length;
+      if (good < 6) $('#dlList').insertAdjacentHTML('beforeend', `<p class="howto" style="margin-top:14px">The right order:</p>` + right.map(id => `<div class="dl-item ok"><span class="dl-year">${data.events[id][0]}</span><span class="dl-text">${esc(data.events[id][1])}</span></div>`).join(''));
+      say(good === 6 ? `All six in order, with ${st.checks} check${st.checks === 1 ? '' : 's'}. More tomorrow.` : `${good} of 6 in the right place. More tomorrow.`); }
+    else $('#dlCheck').textContent = `Check the order (${3 - st.checks} left)`;
+  };
+  $('#dlList').onclick = e => { const b = e.target.closest('button'); if (!b || st.over) return; const i = +b.dataset.i, j = i + (+b.dataset.d); [st.order[i], st.order[j]] = [st.order[j], st.order[i]]; marks = null; say(''); LS.set('dl:' + todayKey(), st); draw(); };
+  $('#dlCheck').onclick = () => { st.checks++; marks = true; const good = st.order.filter((id, i) => id === right[i]).length; if (good === 6 || st.checks >= 3) st.over = true; else say(`${good} of 6 in the right place.`); LS.set('dl:' + todayKey(), st); draw(); };
+  keyHandler = null; draw();
+}
+
+// ------------------------------------------------------------------ The Quiz (one question from each category)
+async function quiz() {
+  frame('The Quiz');
+  const data = await load('trivia'); const n = dayNo(data.start);
+  const qs = data.cats.map((cat, i) => { const q = cat.q[n % cat.q.length]; return { cat: cat.name, text: q[0], right: q[1][0], opts: shuffle(q[1], 500 + n * 7 + i) }; });
+  const st = LS.get('qz:' + todayKey(), { picks: [] });
+  const draw = () => {
+    const i = st.picks.length, score = st.picks.filter((x, k) => x === qs[k].right).length;
+    if (i >= qs.length) {
+      $('#main').innerHTML = `<p class="qz-score">${score} of ${qs.length}</p><p class="msg">${score === qs.length ? 'A clean sweep.' : score >= 4 ? 'A good day at the desk.' : 'Tomorrow is another edition.'} Six new questions tomorrow.</p>` +
+        qs.map((q, k) => `<div class="dl-item ${st.picks[k] === q.right ? 'ok' : 'no'}"><span class="dl-text"><span class="muted small">${esc(q.cat)}</span><br>${esc(q.text)}<br><b>${esc(q.right)}</b>${st.picks[k] === q.right ? '' : ` <span class="muted">(you said ${esc(st.picks[k])})</span>`}</span></div>`).join('');
+      return;
+    }
+    const q = qs[i];
+    $('#main').innerHTML = `<p class="howto">Question ${i + 1} of ${qs.length} · ${score} right so far</p><p class="qz-cat">${esc(q.cat)}</p><p class="qz-q">${esc(q.text)}</p>
+      <div class="qz-opts" id="qzOpts">${q.opts.map(o => `<button data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div><div class="msg" id="qzMsg"></div><div class="row"><button class="btn hidden" id="qzNext">${i === qs.length - 1 ? 'See the score' : 'Next question'}</button></div>`;
+    $('#qzOpts').onclick = e => { const b = e.target.closest('button'); if (!b || $('#qzOpts').dataset.done) return; $('#qzOpts').dataset.done = 1;
+      const pick = b.dataset.o; st.picks.push(pick); LS.set('qz:' + todayKey(), st);
+      for (const x of $('#qzOpts').children) { if (x.dataset.o === q.right) x.classList.add('ok'); else if (x === b) x.classList.add('no'); x.disabled = true; }
+      $('#qzMsg').textContent = pick === q.right ? 'Right.' : `It was: ${q.right}.`; $('#qzNext').classList.remove('hidden'); $('#qzNext').onclick = draw; };
+  };
+  keyHandler = null; draw();
+}
+
 // ------------------------------------------------------------------ routing
 let keyHandler = null;
 document.addEventListener('keydown', e => { if (keyHandler) keyHandler(e); });
 function route() {
   keyHandler = null;
   const h = location.hash.replace(/^#/, '');
-  if (h === 'typecase') typecase(); else if (h === 'stoppress') stoppress(); else if (h === 'columns') columns(); else if (h.startsWith('g:')) embed(h.slice(2)); else hub();
+  if (h === 'typecase') typecase(); else if (h === 'stoppress') stoppress(); else if (h === 'crossword') crossword(); else if (h === 'dateline') dateline(); else if (h === 'quiz') quiz(); else if (h === 'columns') columns(); else if (h.startsWith('g:')) embed(h.slice(2)); else hub();
 }
 window.addEventListener('hashchange', route);
 route();
