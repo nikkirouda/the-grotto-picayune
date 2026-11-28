@@ -149,6 +149,6 @@ other people's free games is the `SHELF` list in `play.js`: `embed: true` only w
 frame-blocking header; otherwise it is a link. Embedded games run in a sandboxed frame from their own sites.
 Also in `site/play/`, all hand-written and easy to extend: **The Crossword** (`crossword.json`: a 5×5 lattice, three
 across and three down; each entry gives the six words and six clues, and the down words must cross the across words
-at letters 1, 3 and 5), **Dateline** (`timeline.json`: `[year, event]` pairs, one event per year; six are drawn each
+at letters 1, 3 and 5), **Dateline** (`timeline.json`: `[year, event]` pairs, one event per year; ten are drawn each
 day) and **The Quiz** (`trivia.json`: six categories of twelve questions; the first option is the right answer).
 Check any new date or fact against a source before adding it.
